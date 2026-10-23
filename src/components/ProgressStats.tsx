@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { glassCard, inputBase } from '../ui'
 
 export default function ProgressStats({ session }: { session: any }) {
   const [logs, setLogs] = useState<any[]>([])
@@ -52,48 +53,58 @@ export default function ProgressStats({ session }: { session: any }) {
     setChartData(Object.values(grouped))
   }, [selectedExercise, logs])
 
-  if (loading) return <p className="text-zinc-400">Pobieranie danych...</p>
+  if (loading) return <p className="text-zinc-400 font-bold animate-pulse">Pobieranie danych...</p>
 
   return (
-    <div className="max-w-4xl">
-      <h1 className="text-3xl font-bold mb-8">Twoje Postępy</h1>
-      
-      {exercises.length === 0 ? (
-        <p className="text-zinc-500 italic">Brak danych. Wykonaj najpierw kilka treningów w Dzienniku!</p>
-      ) : (
-        <div className="bg-zinc-800 p-6 rounded-3xl border border-zinc-700">
-          <label className="block text-zinc-400 mb-2 font-bold">Wybierz ćwiczenie do analizy:</label>
-          <select 
-            value={selectedExercise} 
-            onChange={e => setSelectedExercise(e.target.value)} 
-            className="w-full p-3 rounded-2xl bg-zinc-900 border border-zinc-600 text-white outline-none focus:border-emerald-500 mb-8"
-          >
-            {exercises.map(ex => (
-              <option key={ex} value={ex}>{ex}</option>
-            ))}
-          </select>
+    <div className="max-w-4xl w-full flex flex-col gap-8 animate-fade-in">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-4xl font-extrabold tracking-tight text-white">Twoje Postępy</h1>
+        <p className="text-zinc-400">Śledź, jak rośnie Twoja siła.</p>
+      </div>
 
-          <div className="w-full" style={{ height: '350px' }}>
+      {exercises.length === 0 ? (
+        <div className={`${glassCard} text-center py-16 flex flex-col gap-3 border-dashed`}>
+          <span className="text-5xl">📈</span>
+          <p className="text-xl font-bold text-white">Brak danych</p>
+          <p className="text-zinc-400">Wykonaj najpierw kilka treningów w Dzienniku!</p>
+        </div>
+      ) : (
+        <div className={`${glassCard} p-8 flex flex-col gap-8`}>
+          <div className="flex flex-col gap-3">
+            <label className="font-bold text-white">Wybierz ćwiczenie do analizy</label>
+            <select
+              value={selectedExercise}
+              onChange={e => setSelectedExercise(e.target.value)}
+              className={inputBase}
+            >
+              {exercises.map(ex => (
+                <option key={ex} value={ex}>{ex}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="w-full rounded-2xl bg-black/20 border border-white/5 p-4" style={{ height: '350px' }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
-                <XAxis dataKey="date" stroke="#a1a1aa" tick={{fill: '#a1a1aa'}} />
-                <YAxis stroke="#a1a1aa" tick={{fill: '#a1a1aa'}} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46', borderRadius: '1rem', color: '#fff' }}
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                <XAxis dataKey="date" stroke="#a1a1aa" tick={{ fill: '#a1a1aa' }} />
+                <YAxis stroke="#a1a1aa" tick={{ fill: '#a1a1aa' }} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: 'rgba(9,9,11,0.85)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }}
                   itemStyle={{ color: '#34d399' }}
                 />
-                <Line type="monotone" dataKey="weight" stroke="#34d399" strokeWidth={3} dot={{ r: 5, fill: '#34d399' }} activeDot={{ r: 8 }} name="Max Ciężar (kg)" />
+                <Line type="monotone" dataKey="weight" stroke="#34d399" strokeWidth={4} dot={{ r: 5, fill: '#34d399' }} activeDot={{ r: 8 }} name="Max Ciężar (kg)" />
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-8 border-t border-zinc-700 pt-6">
-            <h3 className="text-xl font-bold text-zinc-300 mb-4">Historia wyników (Max ciężar na dany dzień)</h3>
+
+          <div className="flex flex-col gap-4 border-t border-white/10 pt-8">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Historia wyników (max ciężar na dany dzień)</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {chartData.map(d => (
-                <div key={d.date} className="bg-zinc-900 p-4 rounded-2xl border border-zinc-700 flex flex-col">
-                  <span className="text-zinc-500 text-sm mb-1">{d.date}</span>
-                  <span className="text-emerald-400 font-bold text-2xl">{d.weight} kg</span>
+                <div key={d.date} className="rounded-2xl bg-black/30 border border-white/5 p-4 flex flex-col gap-1 transition-all duration-200 hover:-translate-y-1 hover:border-emerald-500/30">
+                  <span className="text-zinc-400 text-sm">{d.date}</span>
+                  <span className="text-emerald-400 font-extrabold text-2xl">{d.weight} kg</span>
                 </div>
               ))}
             </div>
@@ -101,6 +112,6 @@ export default function ProgressStats({ session }: { session: any }) {
         </div>
       )}
     </div>
-
   )
 }
+

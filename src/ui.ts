@@ -16,6 +16,10 @@ export const btnPrimarySm =
 export const btnGhost =
   'bg-white/5 border border-white/10 text-zinc-300 font-bold rounded-2xl py-3 px-5 transition-all duration-200 hover:bg-white/10 hover:text-white active:scale-95'
 
+// Przycisk destrukcyjny (blokuj / usuń / zakończ)
+export const btnDanger =
+  'bg-red-500/10 border border-red-500/20 text-red-400 font-bold rounded-2xl py-3 px-5 transition-all duration-200 hover:bg-red-500/20 hover:text-red-300 active:scale-95'
+
 // Stan disabled dla przycisków akcji
 export const btnDisabled =
   'disabled:opacity-50 disabled:pointer-events-none'

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import { glassCard, btnPrimarySm, btnGhost, btnDanger } from '../ui'
 
 export default function ClientManagement({ session }: { session: any }) {
   const [pendingRequests, setPendingRequests] = useState<any[]>([])
@@ -18,7 +19,6 @@ export default function ClientManagement({ session }: { session: any }) {
   useEffect(() => { fetchTrainerClients() }, [])
 
   const acceptRequest = async (id: string) => { await supabase.from('trainer_clients').update({ status: 'active' }).eq('id', id); fetchTrainerClients() }
-  const rejectRequest = async (id: string) => { await supabase.from('trainer_clients').update({ status: 'rejected' }).eq('id', id); fetchTrainerClients() }
   
   const blockClient = async (id: string) => { 
     if (window.confirm("Zablokować tego użytkownika? Nie będzie mógł wysyłać Ci zaproszeń.")) { 
@@ -41,51 +41,68 @@ export default function ClientManagement({ session }: { session: any }) {
   }
 
   return (
-    <div className="max-w-4xl">
-      <h1 className="text-3xl font-bold mb-8">Zarządzanie Podopiecznymi</h1>
-      
-      <h2 className="text-xl font-bold text-yellow-500 mb-4">Oczekujące zaproszenia</h2>
-      <div className="grid grid-cols-1 gap-4 mb-10">
-        {pendingRequests.map(req => (
-          <div key={req.id} className="bg-zinc-800 p-4 rounded-2xl border border-yellow-600/30 flex justify-between items-center">
-            <p className="font-bold text-lg">@{req.client.nickname}</p>
-            <div className="flex gap-2">
-              <button onClick={() => acceptRequest(req.id)} className="bg-emerald-600 px-3 py-1.5 rounded-xl font-bold hover:bg-emerald-500 text-sm transition-all active:scale-95">Akceptuj</button>
-              <button onClick={() => blockClient(req.id)} className="bg-red-600 px-3 py-1.5 rounded-xl font-bold hover:bg-red-500 text-sm transition-all active:scale-95">Blokuj</button>
-            </div>
-          </div>
-        ))}
-        {pendingRequests.length === 0 && <p className="text-zinc-500 italic">Brak oczekujących zaproszeń.</p>}
+    <div className="max-w-4xl w-full flex flex-col gap-8 animate-fade-in">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-4xl font-extrabold tracking-tight text-white">Zarządzanie Podopiecznymi</h1>
+        <p className="text-zinc-400">Akceptuj zaproszenia i zarządzaj współpracą.</p>
       </div>
 
-      <h2 className="text-xl font-bold text-emerald-400 mb-4">Twoi aktywni podopieczni</h2>
-      <div className="grid grid-cols-1 gap-4 mb-10">
-        {activeClients.map(req => (
-          <div key={req.id} className="bg-zinc-800 p-4 rounded-2xl border border-zinc-700 flex justify-between items-center">
-            <p className="font-bold text-lg">@{req.client.nickname}</p>
-            {/* NOWE: Przyciski dla aktywnych klientów */}
-            <div className="flex gap-2">
-              <button onClick={() => removeClient(req.id)} className="bg-zinc-700 px-4 py-2 rounded-xl font-bold hover:bg-zinc-600 text-sm transition-all active:scale-95">Zakończ współpracę</button>
-              <button onClick={() => blockClient(req.id)} className="bg-red-900/30 text-red-400 px-4 py-2 rounded-xl font-bold hover:bg-red-600 hover:text-white text-sm transition-all active:scale-95">Blokuj</button>
+      {/* OCZEKUJĄCE */}
+      <section className="flex flex-col gap-4">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-amber-400">Oczekujące zaproszenia ({pendingRequests.length})</h2>
+        <div className="flex flex-col gap-4">
+          {pendingRequests.map(req => (
+            <div key={req.id} className={`${glassCard} flex items-center justify-between gap-6 border-amber-500/20`}>
+              <p className="text-xl font-bold text-white">@{req.client.nickname}</p>
+              <div className="flex gap-3">
+                <button onClick={() => acceptRequest(req.id)} className={btnPrimarySm}>Akceptuj</button>
+                <button onClick={() => blockClient(req.id)} className={btnDanger}>Blokuj</button>
+              </div>
             </div>
-          </div>
-        ))}
-        {activeClients.length === 0 && <p className="text-zinc-500 italic">Nie masz jeszcze aktywnych podopiecznych.</p>}
-      </div>
+          ))}
+          {pendingRequests.length === 0 && (
+            <div className="rounded-3xl border border-dashed border-white/10 bg-black/20 p-8 text-center text-zinc-400">Brak oczekujących zaproszeń.</div>
+          )}
+        </div>
+      </section>
 
+      {/* AKTYWNI */}
+      <section className="flex flex-col gap-4">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-emerald-400">Twoi aktywni podopieczni ({activeClients.length})</h2>
+        <div className="flex flex-col gap-4">
+          {activeClients.map(req => (
+            <div key={req.id} className={`${glassCard} flex items-center justify-between gap-6`}>
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/15 text-xl">💪</div>
+                <p className="text-xl font-bold text-white">@{req.client.nickname}</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => removeClient(req.id)} className={btnGhost}>Zakończ współpracę</button>
+                <button onClick={() => blockClient(req.id)} className={btnDanger}>Blokuj</button>
+              </div>
+            </div>
+          ))}
+          {activeClients.length === 0 && (
+            <div className="rounded-3xl border border-dashed border-white/10 bg-black/20 p-8 text-center text-zinc-400">Nie masz jeszcze aktywnych podopiecznych.</div>
+          )}
+        </div>
+      </section>
+
+      {/* ZABLOKOWANI */}
       {blockedClients.length > 0 && (
-        <>
-          <h2 className="text-xl font-bold text-zinc-500 mb-4 border-t border-zinc-700 pt-8">Zablokowani użytkownicy</h2>
-          <div className="grid grid-cols-1 gap-4">
+        <section className="flex flex-col gap-4 border-t border-white/10 pt-8">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Zablokowani użytkownicy ({blockedClients.length})</h2>
+          <div className="flex flex-col gap-4">
             {blockedClients.map(req => (
-              <div key={req.id} className="bg-zinc-900 p-4 rounded-2xl border border-red-900/30 flex justify-between items-center opacity-70">
-                <p className="font-bold text-zinc-500 line-through">@{req.client.nickname}</p>
-                <button onClick={() => unblockClient(req.id)} className="border border-zinc-600 px-4 py-2 rounded-xl font-bold hover:bg-zinc-700 text-zinc-300 text-sm transition-all active:scale-95">Odblokuj</button>
+              <div key={req.id} className="flex items-center justify-between gap-6 rounded-3xl border border-red-500/10 bg-black/30 p-6 opacity-80">
+                <p className="text-lg font-bold text-zinc-400 line-through">@{req.client.nickname}</p>
+                <button onClick={() => unblockClient(req.id)} className={btnGhost}>Odblokuj</button>
               </div>
             ))}
           </div>
-        </>
+        </section>
       )}
     </div>
   )
 }
+

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
+import { glassCard, btnPrimary, inputBase } from '../ui'
 
 export default function Chat({ session }: { session: any }) {
   const [allUsers, setAllUsers] = useState<any[]>([])
@@ -81,61 +82,62 @@ export default function Chat({ session }: { session: any }) {
   )
 
   return (
-    <div className="flex h-[80vh] border border-zinc-700 rounded-3xl overflow-hidden bg-zinc-900">
-      
+    <div className="flex h-[80vh] w-full max-w-6xl gap-6 animate-fade-in">
+
       {/* LEWA KOLUMNA - LISTA WSZYSTKICH UŻYTKOWNIKÓW */}
-      <div className="w-1/3 border-r border-zinc-700 bg-zinc-950 flex flex-col">
-        <div className="p-4 border-b border-zinc-700 bg-zinc-900">
-          <h2 className="font-bold text-emerald-400 mb-3">Społeczność</h2>
-          <input 
-            type="text" 
-            placeholder="Szukaj użytkownika..." 
+      <div className={`${glassCard} w-1/3 p-0 flex flex-col overflow-hidden`}>
+        <div className="flex flex-col gap-4 border-b border-white/10 p-6">
+          <h2 className="text-2xl font-extrabold tracking-tight text-white">Społeczność</h2>
+          <input
+            type="text"
+            placeholder="Szukaj użytkownika..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-2 text-white outline-none focus:border-emerald-500 text-sm"
+            className={inputBase}
           />
         </div>
-        
-        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
           {filteredUsers.map(user => (
-            <button 
-              key={user.id} 
-              onClick={() => setActiveContact(user)} 
-              className={`w-full text-left p-3 rounded-2xl transition-colors flex flex-col ${activeContact?.id === user.id ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}
+            <button
+              key={user.id}
+              onClick={() => setActiveContact(user)}
+              className={`w-full text-left rounded-2xl border p-4 flex flex-col gap-1 transition-all duration-200 active:scale-95 ${activeContact?.id === user.id ? 'bg-emerald-500/15 border-emerald-500/40 text-white' : 'bg-white/5 border-transparent text-zinc-400 hover:bg-white/10 hover:text-white'}`}
             >
               <span className="font-bold">@{user.nickname || 'Nieznajomy'}</span>
-              <span className="text-xs opacity-70 uppercase mt-1">{user.role}</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">{user.role}</span>
             </button>
           ))}
           {filteredUsers.length === 0 && (
-            <p className="text-zinc-500 p-4 text-sm text-center">Nikogo nie znaleziono.</p>
+            <p className="text-zinc-400 p-4 text-sm text-center">Nikogo nie znaleziono.</p>
           )}
         </div>
       </div>
 
       {/* PRAWA KOLUMNA - OKNO CZATU */}
-      <div className="flex-1 flex flex-col bg-zinc-900">
+      <div className={`${glassCard} flex-1 p-0 flex flex-col overflow-hidden`}>
         {!activeContact ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-zinc-500">
-            <span className="text-4xl mb-4">💬</span>
-            <p className="font-bold">Wybierz osobę z listy, aby rozpocząć czat.</p>
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
+            <span className="text-5xl">💬</span>
+            <p className="font-bold text-white">Wybierz osobę z listy</p>
+            <p className="text-zinc-400">Kliknij kontakt po lewej, aby rozpocząć czat.</p>
           </div>
         ) : (
           <>
-            <div className="p-4 border-b border-zinc-700 bg-zinc-800 flex justify-between items-center shadow-md z-10">
-              <span className="font-bold text-white">Czat z: @{activeContact.nickname}</span>
-              <span className="text-xs bg-zinc-700 text-zinc-300 px-2 py-1 rounded-full uppercase">{activeContact.role}</span>
+            <div className="flex items-center justify-between border-b border-white/10 bg-black/40 backdrop-blur-md px-6 py-4">
+              <span className="text-lg font-bold text-white">@{activeContact.nickname}</span>
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-zinc-400">{activeContact.role}</span>
             </div>
-            
-            <div className="flex-1 p-6 overflow-y-auto space-y-4 flex flex-col bg-zinc-900/50">
+
+            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
               {messages.length === 0 ? (
-                <div className="text-center text-zinc-500 mt-10">To początek waszej konwersacji. Napisz "Cześć!" 👋</div>
+                <div className="text-center text-zinc-400 mt-10">To początek waszej konwersacji. Napisz "Cześć!" 👋</div>
               ) : (
                 messages.map(msg => {
                   const isMe = msg.sender_id === session?.user?.id
                   return (
                     <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[70%] p-3 rounded-2xl ${isMe ? 'bg-emerald-600 text-white rounded-br-none' : 'bg-zinc-700 text-zinc-100 rounded-bl-none'}`}>
+                      <div className={`max-w-[70%] rounded-3xl px-5 py-3 shadow-lg ${isMe ? 'bg-emerald-500 text-white rounded-br-md shadow-emerald-500/20' : 'bg-white/10 border border-white/10 text-white rounded-bl-md'}`}>
                         {msg.content}
                       </div>
                     </div>
@@ -144,19 +146,19 @@ export default function Chat({ session }: { session: any }) {
               )}
               <div ref={messagesEndRef} />
             </div>
-            
-            <form onSubmit={sendMessage} className="p-4 border-t border-zinc-700 bg-zinc-800 flex gap-2">
-              <input 
-                type="text" 
-                value={newMessage} 
-                onChange={e => setNewMessage(e.target.value)} 
-                placeholder="Napisz wiadomość..." 
-                className="flex-1 bg-zinc-900 border border-zinc-600 rounded-2xl p-3 text-white outline-none focus:border-emerald-500" 
+
+            <form onSubmit={sendMessage} className="flex gap-4 border-t border-white/10 bg-black/40 backdrop-blur-md p-4">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={e => setNewMessage(e.target.value)}
+                placeholder="Napisz wiadomość..."
+                className={inputBase}
               />
-              <button 
-                type="submit" 
-                disabled={!newMessage.trim()} 
-                className="bg-emerald-600 px-6 py-3 rounded-2xl font-bold hover:bg-emerald-500 disabled:opacity-50 text-white transition-all active:scale-95"
+              <button
+                type="submit"
+                disabled={!newMessage.trim()}
+                className={`${btnPrimary} disabled:opacity-50 disabled:pointer-events-none`}
               >
                 Wyślij
               </button>
@@ -167,3 +169,4 @@ export default function Chat({ session }: { session: any }) {
     </div>
   )
 }
+

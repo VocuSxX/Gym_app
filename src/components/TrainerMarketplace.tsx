@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import { glassCard, btnPrimarySm, inputBase } from '../ui'
 
 export default function TrainerMarketplace({ session }: { session: any }) {
   const [trainers, setTrainers] = useState<any[]>([])
@@ -32,19 +33,34 @@ export default function TrainerMarketplace({ session }: { session: any }) {
   }
 
   const filteredTrainers = trainers.filter(t => t.nickname?.toLowerCase().includes(searchQuery.toLowerCase()))
-
   return (
-    <div className="max-w-4xl">
-      <h1 className="text-3xl font-bold mb-6">Społeczność Trenerów</h1>
-      <input type="text" placeholder="Szukaj po nicku..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full mb-8 p-4 rounded-2xl bg-zinc-800 border border-zinc-700 outline-none focus:border-emerald-500" />
+    <div className="max-w-4xl w-full flex flex-col gap-8 animate-fade-in">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-4xl font-extrabold tracking-tight text-white">Społeczność Trenerów</h1>
+        <p className="text-zinc-400">Znajdź trenera i wyślij zaproszenie do współpracy.</p>
+      </div>
+
+      <input type="text" placeholder="Szukaj po nicku..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className={`${inputBase} text-lg`} />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredTrainers.map(trainer => (
-          <div key={trainer.id} className="bg-zinc-800 p-6 rounded-3xl border border-zinc-700">
-            <h3 className="text-xl font-bold text-white mb-2">@{trainer.nickname || 'Nieznajomy'}</h3>
-            <button onClick={() => sendInvite(trainer.id)} className="bg-zinc-700 w-full py-3 rounded-2xl font-bold hover:bg-emerald-600 transition-all active:scale-95 mt-4">🤝 Wyślij zaproszenie</button>
+          <div key={trainer.id} className={`${glassCard} flex flex-col gap-6 transition-all duration-200 hover:-translate-y-1 hover:border-emerald-500/30`}>
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/15 text-2xl">🎓</div>
+              <div className="flex flex-col">
+                <h3 className="text-xl font-bold text-white">@{trainer.nickname || 'Nieznajomy'}</h3>
+                <span className="text-sm text-zinc-400">Trener</span>
+              </div>
+            </div>
+            <button onClick={() => sendInvite(trainer.id)} className={btnPrimarySm}>🤝 Wyślij zaproszenie</button>
           </div>
         ))}
+        {filteredTrainers.length === 0 && (
+          <div className="md:col-span-2 rounded-3xl border border-dashed border-white/10 bg-black/20 p-10 text-center text-zinc-400">Nie znaleziono żadnych trenerów.</div>
+        )}
       </div>
     </div>
   )
 }
+
+
