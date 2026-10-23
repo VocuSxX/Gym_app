@@ -28,7 +28,7 @@ export default function WorkoutJournal({ session }: { session: any }) {
         workouts (
           id, name, order_index,
           workout_exercises (
-            id, name, target_sets, target_reps, rir, order_index
+            id, name, target_sets, target_reps, rir, order_index, image_url
           )
         )
       `)
@@ -120,13 +120,13 @@ export default function WorkoutJournal({ session }: { session: any }) {
     }
   }
 
-  if (loading) return <p className="text-gray-400 animate-pulse">Ładowanie planu...</p>
+  if (loading) return <p className="text-zinc-400 animate-pulse">Ładowanie planu...</p>
 
   if (!activePlan) {
     return (
-      <div className="max-w-2xl text-center py-20 bg-gray-800 rounded-xl border border-dashed border-gray-600">
-        <h2 className="text-2xl font-bold text-gray-400 mb-2">Brak aktywnego planu</h2>
-        <p className="text-gray-500">Twój trener musi najpierw przypisać Ci plan treningowy.</p>
+      <div className="max-w-2xl text-center py-20 bg-zinc-800 rounded-3xl border border-dashed border-zinc-600">
+        <h2 className="text-2xl font-bold text-zinc-400 mb-2">Brak aktywnego planu</h2>
+        <p className="text-zinc-500">Twój trener musi najpierw przypisać Ci plan treningowy.</p>
       </div>
     )
   }
@@ -137,17 +137,17 @@ export default function WorkoutJournal({ session }: { session: any }) {
       {/* JEŚLI NIE WYBRANO DNIA: Wyświetlamy Przegląd Planu */}
       {!activeWorkout ? (
         <div className="animate-fade-in">
-          <div className="bg-gradient-to-r from-pink-900/40 to-gray-900 p-8 rounded-2xl border border-pink-500/30 mb-8">
+          <div className="bg-gradient-to-r from-emerald-900/30 to-zinc-900 p-8 rounded-3xl border border-emerald-500/20 mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">{activePlan.name}</h1>
-            <p className="text-pink-400 font-bold">Twój obecny plan treningowy</p>
+            <p className="text-emerald-400 font-bold">Twój obecny plan treningowy</p>
           </div>
 
           <h2 className="text-xl font-bold mb-4">Wybierz trening na dziś:</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {activePlan.workouts.map((workout: any) => (
-              <button key={workout.id} onClick={() => startWorkout(workout)} className="bg-gray-800 p-6 rounded-xl border border-gray-700 hover:border-pink-500 text-left transition-all hover:scale-[1.02]">
+              <button key={workout.id} onClick={() => startWorkout(workout)} className="bg-zinc-800 p-6 rounded-2xl border border-zinc-700 hover:border-emerald-500 text-left transition-all hover:scale-[1.02]">
                 <h3 className="text-xl font-bold text-white mb-1">{workout.name}</h3>
-                <p className="text-gray-400 text-sm">{workout.workout_exercises.length} ćwiczeń</p>
+                <p className="text-zinc-400 text-sm">{workout.workout_exercises.length} ćwiczeń</p>
               </button>
             ))}
           </div>
@@ -155,18 +155,24 @@ export default function WorkoutJournal({ session }: { session: any }) {
       ) : (
         /* JEŚLI WYBRANO DZIEŃ: Właściwy Dziennik (Tryb Treningu) */
         <div className="animate-fade-in">
-          <button onClick={() => setActiveWorkout(null)} className="text-gray-400 hover:text-white mb-6">⬅ Wróć do przeglądu planu</button>
-          <h1 className="text-3xl font-bold mb-8 text-pink-400">🔥 {activeWorkout.name}</h1>
+          <button onClick={() => setActiveWorkout(null)} className="text-zinc-400 hover:text-white mb-6">⬅ Wróć do przeglądu planu</button>
+          <h1 className="text-3xl font-bold mb-8 text-emerald-400">🔥 {activeWorkout.name}</h1>
 
           <div className="space-y-8">
             {activeWorkout.workout_exercises.map((ex: any, idx: number) => {
               const ghost = ghostData[ex.id] || { weight: '', reps: '' }
               
               return (
-                <div key={ex.id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-lg">
-                  <div className="bg-gray-700/50 p-4 border-b border-gray-700">
+                <div key={ex.id} className="bg-zinc-800 rounded-2xl border border-zinc-700 overflow-hidden shadow-lg">
+                  {/* OBRAZEK / GIF NAD ĆWICZENIEM */}
+                  {ex.image_url && (
+                    <div className="w-full bg-black/40 backdrop-blur-md flex items-center justify-center border-b border-zinc-700">
+                      <img src={ex.image_url} alt={ex.name} className="w-full max-h-52 object-contain" />
+                    </div>
+                  )}
+                  <div className="bg-zinc-700/50 p-4 border-b border-zinc-700">
                     <h3 className="text-xl font-bold text-white">{idx + 1}. {ex.name}</h3>
-                    <p className="text-sm text-pink-300 mt-1">Cel: {ex.target_sets} serie • {ex.target_reps} powt • RIR: {ex.rir}</p>
+                    <p className="text-sm text-emerald-300 mt-1">Cel: {ex.target_sets} serie • {ex.target_reps} powt • RIR: {ex.rir}</p>
                   </div>
                   
                   <div className="p-4 space-y-3">
@@ -176,28 +182,28 @@ export default function WorkoutJournal({ session }: { session: any }) {
                       const isCompleted = completedSets.includes(key)
                       
                       return (
-                        <div key={setIdx} className={`flex gap-4 items-center p-3 rounded-lg border ${isCompleted ? 'bg-green-900/20 border-green-700/50' : 'bg-gray-900 border-gray-700'}`}>
-                          <div className="w-8 text-center font-bold text-gray-500">{setIdx + 1}</div>
+                        <div key={setIdx} className={`flex gap-4 items-center p-3 rounded-2xl border ${isCompleted ? 'bg-green-900/20 border-green-700/50' : 'bg-zinc-900 border-zinc-700'}`}>
+                          <div className="w-8 text-center font-bold text-zinc-500">{setIdx + 1}</div>
                           
                           <div className="flex-1">
-                            <label className="block text-[10px] text-gray-500 uppercase tracking-wide">Ciężar (kg)</label>
+                            <label className="block text-[10px] text-zinc-500 uppercase tracking-wide">Ciężar (kg)</label>
                             <input 
                               type="number" 
                               disabled={isCompleted}
                               placeholder={ghost.weight ? `${ghost.weight} kg` : '-'} 
                               onChange={e => handleInputChange(ex.id, setIdx, 'weight', e.target.value)}
-                              className="w-full bg-transparent text-white font-bold text-lg outline-none placeholder-gray-600 disabled:opacity-50"
+                              className="w-full bg-transparent text-white font-bold text-lg outline-none placeholder-zinc-600 disabled:opacity-50"
                             />
                           </div>
                           
                           <div className="flex-1">
-                            <label className="block text-[10px] text-gray-500 uppercase tracking-wide">Powt.</label>
+                            <label className="block text-[10px] text-zinc-500 uppercase tracking-wide">Powt.</label>
                             <input 
                               type="number" 
                               disabled={isCompleted}
                               placeholder={ghost.reps ? `${ghost.reps}` : '-'} 
                               onChange={e => handleInputChange(ex.id, setIdx, 'reps', e.target.value)}
-                              className="w-full bg-transparent text-white font-bold text-lg outline-none placeholder-gray-600 disabled:opacity-50"
+                              className="w-full bg-transparent text-white font-bold text-lg outline-none placeholder-zinc-600 disabled:opacity-50"
                             />
                           </div>
                           
@@ -205,7 +211,7 @@ export default function WorkoutJournal({ session }: { session: any }) {
                           <button 
                             disabled={isCompleted}
                             onClick={() => saveSet(ex, setIdx)} 
-                            className={`px-4 py-3 rounded-lg font-bold transition-colors ${isCompleted ? 'bg-green-600/20 text-green-500' : 'bg-gray-700 text-white hover:bg-pink-600'}`}
+                            className={`px-4 py-3 rounded-2xl font-bold transition-all active:scale-95 ${isCompleted ? 'bg-green-600/20 text-green-500' : 'bg-zinc-700 text-white hover:bg-emerald-600'}`}
                           >
                             {isCompleted ? '✓' : 'Zapisz'}
                           </button>
@@ -218,7 +224,7 @@ export default function WorkoutJournal({ session }: { session: any }) {
             })}
           </div>
           
-          <button onClick={() => { alert("Trening zakończony! Dobra robota!"); setActiveWorkout(null); }} className="w-full mt-10 bg-pink-600 text-white py-4 rounded-xl font-bold text-xl hover:bg-pink-500 shadow-lg shadow-pink-600/30">
+          <button onClick={() => { alert("Trening zakończony! Dobra robota!"); setActiveWorkout(null); }} className="w-full mt-10 bg-emerald-600 text-white py-4 rounded-2xl font-bold text-xl hover:bg-emerald-500 shadow-lg shadow-emerald-600/30 active:scale-95 transition-all">
             Zakończ Trening 🏁
           </button>
         </div>

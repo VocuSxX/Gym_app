@@ -27,10 +27,10 @@ function Dashboard({ session }: { session: any }) {
 
   useEffect(() => { fetchProfile() }, [session])
 
-  if (!profile) return <div className="flex h-screen bg-gray-900 text-white items-center justify-center font-bold">Ładowanie profilu...</div>
+  if (!profile) return <div className="flex h-screen bg-zinc-900 text-white items-center justify-center font-bold">Ładowanie profilu...</div>
 
   return (
-    <div className="flex h-screen bg-gray-900 text-white">
+    <div className="flex h-screen bg-zinc-900 text-white">
       <Sidebar profile={profile} activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <main className="flex-1 p-10 overflow-y-auto">
@@ -39,14 +39,14 @@ function Dashboard({ session }: { session: any }) {
           <div className="max-w-2xl animate-fade-in">
             <h1 className="text-4xl font-bold mb-4">Witaj, {profile.nickname || 'Wojowniku'}! ⚡</h1>
             
-            <div className="bg-gradient-to-r from-gray-800 to-gray-900 p-8 rounded-2xl border border-gray-700 shadow-xl mt-8">
-              <h2 className="text-2xl font-bold text-pink-400 mb-2">Gotowy na kolejny trening?</h2>
-              <p className="text-gray-300 mb-6 text-lg">
+            <div className="bg-gradient-to-r from-zinc-800 to-zinc-900 p-8 rounded-3xl border border-zinc-700/50 shadow-xl mt-8">
+              <h2 className="text-2xl font-bold text-emerald-400 mb-2">Gotowy na kolejny trening?</h2>
+              <p className="text-zinc-300 mb-6 text-lg">
                 Wybierz <strong className="text-white">"Mój Dziennik"</strong> z menu po lewej stronie, aby sprawdzić dzisiejszy plan, lub zajrzyj do zakładki <strong className="text-white">"Moje Postępy"</strong>, żeby sprawdzić, jak rośnie Twoja siła.
               </p>
               
               {profile.role === 'trainer' && (
-                <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-lg">
+                <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-700/50 rounded-2xl">
                   <p className="text-yellow-500 font-bold">Jesteś zalogowany jako Trener. Panel zarządzania podopiecznymi znajdziesz w menu po lewej stronie.</p>
                 </div>
               )}
@@ -62,7 +62,7 @@ function Dashboard({ session }: { session: any }) {
         {activeTab === 'plan_creator' && <WorkoutBuilder session={session} />}
         {activeTab === 'chat' && <Chat session={session} />}
         
-        {activeTab === 'my_trainer' && <div className="text-gray-400 font-bold text-xl">Wkrótce: Mój Trener...</div>}
+        {activeTab === 'my_trainer' && <div className="text-zinc-400 font-bold text-xl">Wkrótce: Mój Trener...</div>}
         
       </main>
     </div>
@@ -79,7 +79,7 @@ function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  if (loading) return <div className="flex h-screen bg-gray-900 text-white items-center justify-center">Ładowanie aplikacji...</div>
+  if (loading) return <div className="flex h-screen bg-zinc-900 text-white items-center justify-center">Ładowanie aplikacji...</div>
   return (
     <BrowserRouter>
       <Routes>

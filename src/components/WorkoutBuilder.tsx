@@ -54,6 +54,7 @@ export default function WorkoutBuilder({ session }: { session: any }) {
             id: Math.random().toString(), 
             db_id: exerciseDb.id, 
             name: exerciseDb.name, 
+            image_url: exerciseDb.image_url || '',
             sets: 3, 
             reps: '10', 
             rir: '2' 
@@ -117,7 +118,8 @@ export default function WorkoutBuilder({ session }: { session: any }) {
           target_sets: ex.sets,
           target_reps: ex.reps,
           rir: ex.rir,
-          order_index: exIdx
+          order_index: exIdx,
+          image_url: ex.image_url || ''
         }))
         await supabase.from('workout_exercises').insert(exercisesToInsert)
       }
@@ -137,29 +139,29 @@ export default function WorkoutBuilder({ session }: { session: any }) {
       {/* WSKAŹNIK POSTĘPU (STEPPER) */}
       <div className="flex justify-center mb-10">
         <div className="flex gap-4 items-center">
-          <div className={`w-12 h-4 rounded ${step >= 1 ? 'bg-pink-500' : 'bg-gray-700'}`}></div>
-          <div className={`w-12 h-4 rounded ${step >= 2 ? 'bg-pink-500' : 'bg-gray-700'}`}></div>
-          <div className={`w-12 h-4 rounded ${step >= 3 ? 'bg-pink-500' : 'bg-gray-700'}`}></div>
+          <div className={`w-12 h-4 rounded-full ${step >= 1 ? 'bg-emerald-500' : 'bg-zinc-700'}`}></div>
+          <div className={`w-12 h-4 rounded-full ${step >= 2 ? 'bg-emerald-500' : 'bg-zinc-700'}`}></div>
+          <div className={`w-12 h-4 rounded-full ${step >= 3 ? 'bg-emerald-500' : 'bg-zinc-700'}`}></div>
         </div>
       </div>
 
-      <div className="bg-gray-800 p-8 rounded-xl border border-gray-700 shadow-xl">
+      <div className="bg-zinc-800 p-8 rounded-3xl border border-zinc-700/50 shadow-xl">
         
         {/* ================================== KROK 1 ================================== */}
         {step === 1 && (
           <div className="animate-fade-in">
             <h1 className="text-3xl font-bold mb-6">Krok 1: Podstawy planu</h1>
             <div className="mb-8">
-              <label className="block text-gray-400 mb-2 font-bold">Nazwa Planu Treningowego</label>
-              <input type="text" value={planName} onChange={e => setPlanName(e.target.value)} className="w-full p-4 rounded-xl bg-gray-900 border border-gray-600 text-white outline-none focus:border-pink-500 text-lg" placeholder="np. Hipertrofia - Blok A" />
+              <label className="block text-zinc-400 mb-2 font-bold">Nazwa Planu Treningowego</label>
+              <input type="text" value={planName} onChange={e => setPlanName(e.target.value)} className="w-full p-4 rounded-2xl bg-zinc-900 border border-zinc-600 text-white outline-none focus:border-emerald-500 text-lg" placeholder="np. Hipertrofia - Blok A" />
             </div>
 
-            <label className="block text-gray-400 mb-4 font-bold">Wybierz dni treningowe (etykiety)</label>
+            <label className="block text-zinc-400 mb-4 font-bold">Wybierz dni treningowe (etykiety)</label>
             <div className="flex flex-wrap gap-3 mb-8">
               {WEEKDAYS.map(day => {
                 const isSelected = days.find(d => d.name === day)
                 return (
-                  <button key={day} onClick={() => toggleDay(day)} className={`px-6 py-3 rounded-xl font-bold transition-colors ${isSelected ? 'bg-pink-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}>
+                  <button key={day} onClick={() => toggleDay(day)} className={`px-6 py-3 rounded-2xl font-bold transition-all active:scale-95 ${isSelected ? 'bg-emerald-600 text-white' : 'bg-zinc-700 text-zinc-400 hover:bg-zinc-600'}`}>
                     {day} {isSelected && '✓'}
                   </button>
                 )
@@ -172,7 +174,7 @@ export default function WorkoutBuilder({ session }: { session: any }) {
                 if(days.length === 0) return alert("Wybierz chociaż jeden dzień!")
                 setActiveDayId(days[0].id)
                 setStep(2)
-              }} className="bg-white text-gray-900 px-8 py-3 rounded-xl font-bold hover:bg-gray-200">
+              }} className="bg-white text-zinc-900 px-8 py-3 rounded-2xl font-bold hover:bg-zinc-200 active:scale-95 transition-all">
                 Dalej ➔
               </button>
             </div>
@@ -185,9 +187,9 @@ export default function WorkoutBuilder({ session }: { session: any }) {
             <h1 className="text-3xl font-bold mb-6">Krok 2: Programowanie ćwiczeń</h1>
             
             {/* Zakładki dni */}
-            <div className="flex gap-2 overflow-x-auto mb-6 border-b border-gray-700 pb-2">
+            <div className="flex gap-2 overflow-x-auto mb-6 border-b border-zinc-700 pb-2">
               {days.map(day => (
-                <button key={day.id} onClick={() => setActiveDayId(day.id)} className={`px-4 py-2 rounded-t-lg font-bold whitespace-nowrap ${activeDayId === day.id ? 'bg-gray-700 text-pink-400 border-b-2 border-pink-500' : 'text-gray-400 hover:bg-gray-700/50'}`}>
+                <button key={day.id} onClick={() => setActiveDayId(day.id)} className={`px-4 py-2 rounded-t-2xl font-bold whitespace-nowrap transition-colors ${activeDayId === day.id ? 'bg-zinc-700 text-emerald-400 border-b-2 border-emerald-500' : 'text-zinc-400 hover:bg-zinc-700/50'}`}>
                   {day.name}
                 </button>
               ))}
@@ -198,42 +200,65 @@ export default function WorkoutBuilder({ session }: { session: any }) {
               <div key={day.id} className="space-y-4">
                 
                 {day.exercises.map((ex, index) => (
-                  <div key={ex.id} className="flex flex-col md:flex-row gap-4 items-center bg-gray-900 p-4 rounded-xl border border-gray-700">
-                    <div className="flex flex-col gap-1 mr-2">
-                      <button onClick={() => moveExercise(day.id, index, 'up')} disabled={index === 0} className="text-gray-500 hover:text-white disabled:opacity-30">⬆️</button>
-                      <button onClick={() => moveExercise(day.id, index, 'down')} disabled={index === day.exercises.length - 1} className="text-gray-500 hover:text-white disabled:opacity-30">⬇️</button>
+                  <div key={ex.id} className="bg-zinc-900 p-4 rounded-2xl border border-zinc-700">
+                    <div className="flex flex-col md:flex-row gap-4 items-center">
+                      <div className="flex flex-col gap-1 mr-2">
+                        <button onClick={() => moveExercise(day.id, index, 'up')} disabled={index === 0} className="text-zinc-500 hover:text-white disabled:opacity-30">⬆️</button>
+                        <button onClick={() => moveExercise(day.id, index, 'down')} disabled={index === day.exercises.length - 1} className="text-zinc-500 hover:text-white disabled:opacity-30">⬇️</button>
+                      </div>
+                      
+                      {ex.image_url && (
+                        <img src={ex.image_url} alt={ex.name} className="w-14 h-14 rounded-xl object-cover border border-zinc-600" />
+                      )}
+                      
+                      <div className="flex-1 w-full">
+                        <p className="font-bold text-lg text-white">{ex.name}</p>
+                      </div>
+                      
+                      <div className="flex gap-4 w-full md:w-auto">
+                        <div>
+                          <label className="block text-xs text-zinc-500 mb-1 text-center">Serie</label>
+                          <input type="number" min="1" value={ex.sets} onChange={e => updateExercise(day.id, ex.id, 'sets', e.target.value)} className="w-16 p-2 rounded-xl bg-zinc-800 text-center outline-none focus:ring-1 focus:ring-emerald-500" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-zinc-500 mb-1 text-center">Powt.</label>
+                          <input type="text" value={ex.reps} onChange={e => updateExercise(day.id, ex.id, 'reps', e.target.value)} className="w-20 p-2 rounded-xl bg-zinc-800 text-center outline-none focus:ring-1 focus:ring-emerald-500" placeholder="np. 8-12" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-zinc-500 mb-1 text-center">RIR</label>
+                          <input type="text" value={ex.rir} onChange={e => updateExercise(day.id, ex.id, 'rir', e.target.value)} className="w-16 p-2 rounded-xl bg-zinc-800 text-center outline-none focus:ring-1 focus:ring-emerald-500" />
+                        </div>
+                        <button onClick={() => removeExercise(day.id, ex.id)} className="text-red-400 hover:text-red-300 ml-2 mt-5">❌</button>
+                      </div>
                     </div>
                     
-                    <div className="flex-1 w-full">
-                      <p className="font-bold text-lg text-pink-100">{ex.name}</p>
-                    </div>
-                    
-                    <div className="flex gap-4 w-full md:w-auto">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1 text-center">Serie</label>
-                        <input type="number" min="1" value={ex.sets} onChange={e => updateExercise(day.id, ex.id, 'sets', e.target.value)} className="w-16 p-2 rounded bg-gray-800 text-center outline-none focus:ring-1 focus:ring-pink-500" />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1 text-center">Powt.</label>
-                        <input type="text" value={ex.reps} onChange={e => updateExercise(day.id, ex.id, 'reps', e.target.value)} className="w-20 p-2 rounded bg-gray-800 text-center outline-none focus:ring-1 focus:ring-pink-500" placeholder="np. 8-12" />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1 text-center">RIR</label>
-                        <input type="text" value={ex.rir} onChange={e => updateExercise(day.id, ex.id, 'rir', e.target.value)} className="w-16 p-2 rounded bg-gray-800 text-center outline-none focus:ring-1 focus:ring-pink-500" />
-                      </div>
-                      <button onClick={() => removeExercise(day.id, ex.id)} className="text-red-400 hover:text-red-300 ml-2 mt-5">❌</button>
+                    {/* POLE NA LINK DO GIF-A / OBRAZKA */}
+                    <div className="mt-3 pt-3 border-t border-zinc-800">
+                      <label className="block text-xs text-zinc-500 mb-1">🖼️ Link do GIF-a / obrazka (technika)</label>
+                      <input
+                        type="url"
+                        value={ex.image_url || ''}
+                        onChange={e => updateExercise(day.id, ex.id, 'image_url', e.target.value)}
+                        placeholder="https://media.giphy.com/... lub link do obrazka"
+                        className="w-full p-2 rounded-xl bg-zinc-800 border border-zinc-700 text-sm text-white outline-none focus:border-emerald-500 placeholder-zinc-600"
+                      />
+                      {ex.image_url && (
+                        <div className="mt-2">
+                          <img src={ex.image_url} alt="Podgląd" className="h-24 rounded-xl object-cover border border-zinc-600" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
 
                 {/* Słownik - Dodawanie ćwiczenia */}
-                <div className="mt-6 bg-gray-900/50 p-4 rounded-xl border border-dashed border-gray-600">
-                  <label className="block text-gray-400 mb-2 font-bold">Dodaj ćwiczenie z bazy:</label>
+                <div className="mt-6 bg-zinc-900/50 p-4 rounded-2xl border border-dashed border-zinc-600">
+                  <label className="block text-zinc-400 mb-2 font-bold">Dodaj ćwiczenie z bazy:</label>
                   <select onChange={e => {
                     const selectedEx = exercisesDb.find(dbEx => dbEx.id === e.target.value)
                     if (selectedEx) addExerciseToDay(day.id, selectedEx)
                     e.target.value = "" // reset selecta
-                  }} className="w-full p-3 rounded bg-gray-800 border border-gray-600 text-white outline-none focus:border-pink-500">
+                  }} className="w-full p-3 rounded-2xl bg-zinc-800 border border-zinc-600 text-white outline-none focus:border-emerald-500">
                     <option value="">+ Wybierz ćwiczenie...</option>
                     {exercisesDb.map(dbEx => (
                       <option key={dbEx.id} value={dbEx.id}>{dbEx.name}</option>
@@ -244,8 +269,8 @@ export default function WorkoutBuilder({ session }: { session: any }) {
             ))}
 
             <div className="flex justify-between mt-10">
-              <button onClick={() => setStep(1)} className="text-gray-400 hover:text-white px-6 py-2">⬅ Wstecz</button>
-              <button onClick={() => setStep(3)} className="bg-white text-gray-900 px-8 py-3 rounded-xl font-bold hover:bg-gray-200">Podsumowanie ➔</button>
+              <button onClick={() => setStep(1)} className="text-zinc-400 hover:text-white px-6 py-2">⬅ Wstecz</button>
+              <button onClick={() => setStep(3)} className="bg-white text-zinc-900 px-8 py-3 rounded-2xl font-bold hover:bg-zinc-200 active:scale-95 transition-all">Podsumowanie ➔</button>
             </div>
           </div>
         )}
@@ -254,20 +279,21 @@ export default function WorkoutBuilder({ session }: { session: any }) {
         {step === 3 && (
           <div className="animate-fade-in">
             <h1 className="text-3xl font-bold mb-2">Krok 3: Przypisanie Planu</h1>
-            <p className="text-gray-400 mb-8">Sprawdź strukturę i wybierz podopiecznego.</p>
+            <p className="text-zinc-400 mb-8">Sprawdź strukturę i wybierz podopiecznego.</p>
             
-            <div className="bg-gray-900 p-6 rounded-xl border border-pink-500/30 mb-8">
-              <h2 className="text-2xl font-bold text-pink-400 mb-4">{planName}</h2>
+            <div className="bg-zinc-900 p-6 rounded-2xl border border-emerald-500/30 mb-8">
+              <h2 className="text-2xl font-bold text-emerald-400 mb-4">{planName}</h2>
               <div className="space-y-6">
                 {days.map(day => (
                   <div key={day.id}>
-                    <h3 className="font-bold text-lg text-white border-b border-gray-700 pb-1 mb-2">{day.name}</h3>
-                    {day.exercises.length === 0 ? <p className="text-gray-500 text-sm italic">Brak ćwiczeń</p> : (
-                      <ul className="space-y-1">
+                    <h3 className="font-bold text-lg text-white border-b border-zinc-700 pb-1 mb-2">{day.name}</h3>
+                    {day.exercises.length === 0 ? <p className="text-zinc-500 text-sm italic">Brak ćwiczeń</p> : (
+                      <ul className="space-y-2">
                         {day.exercises.map((ex, idx) => (
-                          <li key={idx} className="text-gray-300 flex justify-between">
-                            <span>{idx+1}. {ex.name}</span>
-                            <span className="text-gray-500">{ex.sets} serie | {ex.reps} powt | RIR: {ex.rir}</span>
+                          <li key={idx} className="text-zinc-300 flex items-center gap-3">
+                            {ex.image_url && <img src={ex.image_url} alt={ex.name} className="w-10 h-10 rounded-lg object-cover border border-zinc-600" />}
+                            <span className="flex-1">{idx+1}. {ex.name}</span>
+                            <span className="text-zinc-500">{ex.sets} serie | {ex.reps} powt | RIR: {ex.rir}</span>
                           </li>
                         ))}
                       </ul>
@@ -279,7 +305,7 @@ export default function WorkoutBuilder({ session }: { session: any }) {
 
             <div className="mb-8">
               <label className="block text-xl font-bold text-white mb-4">Wybierz ucznia docelowego:</label>
-              <select value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)} className="w-full p-4 rounded-xl bg-gray-900 border border-gray-600 text-white outline-none focus:border-pink-500 text-lg">
+              <select value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)} className="w-full p-4 rounded-2xl bg-zinc-900 border border-zinc-600 text-white outline-none focus:border-emerald-500 text-lg">
                 <option value="">-- Wybierz podopiecznego --</option>
                 {activeClients.map(c => (
                   <option key={c.client.id} value={c.client.id}>@{c.client.nickname}</option>
@@ -288,8 +314,8 @@ export default function WorkoutBuilder({ session }: { session: any }) {
             </div>
 
             <div className="flex justify-between mt-10">
-              <button onClick={() => setStep(2)} className="text-gray-400 hover:text-white px-6 py-2">⬅ Wróć do edycji</button>
-              <button onClick={handleSavePlan} disabled={saving} className="bg-pink-600 text-white px-10 py-4 rounded-xl font-bold hover:bg-pink-500 shadow-lg shadow-pink-600/30 text-lg disabled:opacity-50 transition-all">
+              <button onClick={() => setStep(2)} className="text-zinc-400 hover:text-white px-6 py-2">⬅ Wróć do edycji</button>
+              <button onClick={handleSavePlan} disabled={saving} className="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-bold hover:bg-emerald-500 shadow-lg shadow-emerald-600/30 text-lg disabled:opacity-50 active:scale-95 transition-all">
                 {saving ? 'Wysyłanie na serwer...' : '🚀 Zatwierdź i Wyślij Plan!'}
               </button>
             </div>

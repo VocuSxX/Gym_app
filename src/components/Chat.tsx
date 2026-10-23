@@ -81,18 +81,18 @@ export default function Chat({ session }: { session: any }) {
   )
 
   return (
-    <div className="flex h-[80vh] border border-gray-700 rounded-xl overflow-hidden bg-gray-900">
+    <div className="flex h-[80vh] border border-zinc-700 rounded-3xl overflow-hidden bg-zinc-900">
       
       {/* LEWA KOLUMNA - LISTA WSZYSTKICH UŻYTKOWNIKÓW */}
-      <div className="w-1/3 border-r border-gray-700 bg-gray-950 flex flex-col">
-        <div className="p-4 border-b border-gray-700 bg-gray-900">
-          <h2 className="font-bold text-pink-400 mb-3">Społeczność</h2>
+      <div className="w-1/3 border-r border-zinc-700 bg-zinc-950 flex flex-col">
+        <div className="p-4 border-b border-zinc-700 bg-zinc-900">
+          <h2 className="font-bold text-emerald-400 mb-3">Społeczność</h2>
           <input 
             type="text" 
             placeholder="Szukaj użytkownika..." 
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full bg-gray-800 border border-gray-700 rounded p-2 text-white outline-none focus:border-pink-500 text-sm"
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-2 text-white outline-none focus:border-emerald-500 text-sm"
           />
         </div>
         
@@ -101,41 +101,41 @@ export default function Chat({ session }: { session: any }) {
             <button 
               key={user.id} 
               onClick={() => setActiveContact(user)} 
-              className={`w-full text-left p-3 rounded-lg transition-colors flex flex-col ${activeContact?.id === user.id ? 'bg-pink-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+              className={`w-full text-left p-3 rounded-2xl transition-colors flex flex-col ${activeContact?.id === user.id ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}
             >
               <span className="font-bold">@{user.nickname || 'Nieznajomy'}</span>
               <span className="text-xs opacity-70 uppercase mt-1">{user.role}</span>
             </button>
           ))}
           {filteredUsers.length === 0 && (
-            <p className="text-gray-500 p-4 text-sm text-center">Nikogo nie znaleziono.</p>
+            <p className="text-zinc-500 p-4 text-sm text-center">Nikogo nie znaleziono.</p>
           )}
         </div>
       </div>
 
       {/* PRAWA KOLUMNA - OKNO CZATU */}
-      <div className="flex-1 flex flex-col bg-gray-900">
+      <div className="flex-1 flex flex-col bg-zinc-900">
         {!activeContact ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
+          <div className="flex-1 flex flex-col items-center justify-center text-zinc-500">
             <span className="text-4xl mb-4">💬</span>
             <p className="font-bold">Wybierz osobę z listy, aby rozpocząć czat.</p>
           </div>
         ) : (
           <>
-            <div className="p-4 border-b border-gray-700 bg-gray-800 flex justify-between items-center shadow-md z-10">
+            <div className="p-4 border-b border-zinc-700 bg-zinc-800 flex justify-between items-center shadow-md z-10">
               <span className="font-bold text-white">Czat z: @{activeContact.nickname}</span>
-              <span className="text-xs bg-gray-700 text-gray-300 px-2 py-1 rounded uppercase">{activeContact.role}</span>
+              <span className="text-xs bg-zinc-700 text-zinc-300 px-2 py-1 rounded-full uppercase">{activeContact.role}</span>
             </div>
             
-            <div className="flex-1 p-6 overflow-y-auto space-y-4 flex flex-col bg-gray-900/50">
+            <div className="flex-1 p-6 overflow-y-auto space-y-4 flex flex-col bg-zinc-900/50">
               {messages.length === 0 ? (
-                <div className="text-center text-gray-500 mt-10">To początek waszej konwersacji. Napisz "Cześć!" 👋</div>
+                <div className="text-center text-zinc-500 mt-10">To początek waszej konwersacji. Napisz "Cześć!" 👋</div>
               ) : (
                 messages.map(msg => {
                   const isMe = msg.sender_id === session?.user?.id
                   return (
                     <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[70%] p-3 rounded-2xl ${isMe ? 'bg-pink-600 text-white rounded-br-none' : 'bg-gray-700 text-gray-100 rounded-bl-none'}`}>
+                      <div className={`max-w-[70%] p-3 rounded-2xl ${isMe ? 'bg-emerald-600 text-white rounded-br-none' : 'bg-zinc-700 text-zinc-100 rounded-bl-none'}`}>
                         {msg.content}
                       </div>
                     </div>
@@ -145,18 +145,18 @@ export default function Chat({ session }: { session: any }) {
               <div ref={messagesEndRef} />
             </div>
             
-            <form onSubmit={sendMessage} className="p-4 border-t border-gray-700 bg-gray-800 flex gap-2">
+            <form onSubmit={sendMessage} className="p-4 border-t border-zinc-700 bg-zinc-800 flex gap-2">
               <input 
                 type="text" 
                 value={newMessage} 
                 onChange={e => setNewMessage(e.target.value)} 
                 placeholder="Napisz wiadomość..." 
-                className="flex-1 bg-gray-900 border border-gray-600 rounded-lg p-3 text-white outline-none focus:border-pink-500" 
+                className="flex-1 bg-zinc-900 border border-zinc-600 rounded-2xl p-3 text-white outline-none focus:border-emerald-500" 
               />
               <button 
                 type="submit" 
                 disabled={!newMessage.trim()} 
-                className="bg-pink-600 px-6 py-3 rounded-lg font-bold hover:bg-pink-500 disabled:opacity-50 text-white transition-colors"
+                className="bg-emerald-600 px-6 py-3 rounded-2xl font-bold hover:bg-emerald-500 disabled:opacity-50 text-white transition-all active:scale-95"
               >
                 Wyślij
               </button>
