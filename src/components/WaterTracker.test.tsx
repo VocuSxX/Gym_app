@@ -19,6 +19,7 @@ describe('WaterTracker', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
   it('pokazuje sumę wypitej wody i procent celu', async () => {
@@ -67,5 +68,46 @@ describe('WaterTracker', () => {
 
     await vi.waitFor(() => expect(callsOf('water_entries', 'select')).not.toHaveLength(0))
     expect(screen.getByRole('button', { name: /Cofnij ostatni/ })).toBeDisabled()
+  })
+
+  it('pomarańczowe ostrzeżenie powyżej 150% celu', async () => {
+    setResult('water_entries', { data: [{ id: '1', amount_ml: 3500 }] })
+    render(<WaterTracker session={session} goalMl={2000} />)
+
+    expect(await screen.findByText(/Przekroczyłeś zalecaną/)).toBeInTheDocument()
+    expect(screen.queryByText(/niebezpieczne/)).not.toBeInTheDocument()
+  })
+
+  it('czerwone ostrzeżenie od 4000 ml', async () => {
+    setResult('water_entries', { data: [{ id: '1', amount_ml: 4000 }] })
+    render(<WaterTracker session={session} goalMl={2000} />)
+
+    expect(await screen.findByText(/niebezpieczne/)).toBeInTheDocument()
+    expect(screen.queryByText(/Przekroczyłeś zalecaną/)).not.toBeInTheDocument()
+  })
+
+  it('własna ilość 300 wstawia wpis z amount_ml: 300', async () => {
+    setResult('water_entries', { data: [] })
+    const onChange = vi.fn()
+    render(<WaterTracker session={session} goalMl={2000} onChange={onChange} />)
+
+    const input = screen.getByPlaceholderText('Własna ilość (ml)')
+    fireEvent.change(input, { target: { value: '300' } })
+    fireEvent.submit(input.closest('form')!)
+
+    await vi.waitFor(() => expect(onChange).toHaveBeenCalledTimes(1))
+    expect(callsOf('water_entries', 'insert')[0].args[0]).toMatchObject({ amount_ml: 300 })
+  })
+
+  it('własna ilość 2500 pokazuje komunikat o maksimum 2000 i nie wstawia wpisu', async () => {
+    setResult('water_entries', { data: [] })
+    render(<WaterTracker session={session} goalMl={2000} />)
+
+    const input = screen.getByPlaceholderText('Własna ilość (ml)')
+    fireEvent.change(input, { target: { value: '2500' } })
+    fireEvent.submit(input.closest('form')!)
+
+    expect(await screen.findByText(/maksymalnie 2000 ml/)).toBeInTheDocument()
+    expect(callsOf('water_entries', 'insert')).toHaveLength(0)
   })
 })
