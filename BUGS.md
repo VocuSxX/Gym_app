@@ -8,3 +8,12 @@
 - **Wpływ:** `calcBmr`, `calcTdee`, `calcTarget` oraz walidacja wieku w `Onboarding.tsx` używają tej funkcji.
 - **Test:** `src/health.test.ts`, test oznaczony `it.fails` (do usunięcia po poprawce).
 - **Sugestia:** liczyć wiek kalendarzowo (porównanie roku, miesiąca i dnia), a nie przez dzielenie przez 365.25.
+
+
+## 2. `WorkoutBuilder` nadal używa `alert()` zamiast toastów
+- **Plik:** `src/components/WorkoutBuilder.tsx` (funkcja `handleSavePlan`, linia 103).
+- **Opis:** brak wybranego odbiorcy planu pokazuje natywne `alert("Wybierz odbiorcę planu z listy!")`. Reszta aplikacji używa `toast.error` z `src/notify.ts`. Wersja `WorkoutBuilder_1.tsx` już to ma, ale nie jest podpięta.
+- **Oczekiwane:** `toast.error("Wybierz odbiorcę planu z listy.")`.
+- **Faktyczne:** `alert(...)`.
+- **Test:** `src/components/WorkoutBuilder.test.tsx`, przypadek „trener bez wyboru odbiorcy” asertuje obecne `alert` (oznaczone `// BUG`).
+- **Sugestia:** podmienić `alert` na `toast.error` i zaktualizować asercję w teście.

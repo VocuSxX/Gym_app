@@ -104,6 +104,7 @@ describe('WorkoutBuilder', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Zatwierdź i Wyślij Plan/ }))
 
+    // BUG: produkcja nadal używa alert() zamiast toast.error (patrz BUGS.md, pkt 2)
     expect(window.alert).toHaveBeenCalledWith('Wybierz odbiorcę planu z listy!')
     expect(callsOf('workout_plans', 'insert')).toHaveLength(0)
   })
