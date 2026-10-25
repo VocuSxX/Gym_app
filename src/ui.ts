@@ -28,6 +28,13 @@ export const btnDisabled =
 export const inputBase =
   'w-full bg-black/30 border border-white/10 rounded-2xl py-3 px-4 text-white placeholder-zinc-500 outline-none transition-all duration-200 focus:border-emerald-500/60 focus:ring-4 focus:ring-emerald-500/15'
 
+// Banery komunikatów (zamiast alert())
+export const bannerError =
+  'rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300'
+
+export const bannerSuccess =
+  'rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300'
+
 // Tło z rozmytymi plamami światła (daje szkłu co rozmywać)
 export const ambientBlobs = [
   'pointer-events-none absolute -top-40 -left-40 h-[28rem] w-[28rem] rounded-full bg-emerald-500/10 blur-3xl',

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { glassCard, btnPrimary, btnGhost, btnDisabled, inputBase } from '../ui'
 
-export default function WorkoutBuilder({ session }: { session: any }) {
+export default function WorkoutBuilder({ session, profile }: { session: any; profile: any }) {
+  const isTrainer = profile?.role === 'trainer'
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
 
@@ -12,7 +13,8 @@ export default function WorkoutBuilder({ session }: { session: any }) {
 
   // Stan Kreatora
   const [planName, setPlanName] = useState('')
-  const [selectedClientId, setSelectedClientId] = useState('')
+  // 'self' = plan dla siebie. Zwykły użytkownik zawsze tworzy plan dla siebie.
+  const [selectedClientId, setSelectedClientId] = useState(isTrainer ? '' : 'self')
   const [days, setDays] = useState<{ id: string, name: string, exercises: any[] }[]>([])
 
   // Pomocnicze do Kroku 2
@@ -22,8 +24,9 @@ export default function WorkoutBuilder({ session }: { session: any }) {
   const STEP_LABELS = ['Podstawy', 'Ćwiczenia', 'Przypisanie']
 
   useEffect(() => {
-    // Pobieramy aktywnych podopiecznych (do Kroku 3)
+    // Pobieramy aktywnych podopiecznych (do Kroku 3) - tylko trener
     const fetchClients = async () => {
+      if (!isTrainer) return
       const { data } = await supabase.from('trainer_clients').select(`client:profiles!client_id(id, nickname)`).eq('trainer_id', session.user.id).eq('status', 'active')
       if (data) setActiveClients(data)
     }
@@ -96,15 +99,29 @@ export default function WorkoutBuilder({ session }: { session: any }) {
 
   // --- ZAPIS DO BAZY ---
   const handleSavePlan = async () => {
-    if (!selectedClientId) return alert("Wybierz podopiecznego z listy!")
+    if (!selectedClientId) return alert("Wybierz odbiorcę planu z listy!")
     setSaving(true)
+
+    const isSelf = selectedClientId === 'self'
+    const clientId = isSelf ? session.user.id : selectedClientId
+
+    // Nowy plan zastępuje poprzedni aktywny plan tej osoby (Dziennik czyta jeden aktywny plan)
+    await supabase.from('workout_plans').update({ status: 'archived' }).eq('client_id', clientId).eq('status', 'active')
 
     const { data: planData, error: planError } = await supabase
       .from('workout_plans')
-      .insert({ trainer_id: session.user.id, client_id: selectedClientId, name: planName })
+      .insert({
+        trainer_id: isSelf && !isTrainer ? null : session.user.id,
+        client_id: clientId,
+        name: planName,
+        is_self_made: isSelf,
+      })
       .select().single()
 
-    if (planError) return alert("Błąd zapisu planu!")
+    if (planError || !planData) {
+      setSaving(false)
+      return alert("Błąd zapisu planu!")
+    }
 
     for (let i = 0; i < days.length; i++) {
       const day = days[i]
@@ -127,11 +144,11 @@ export default function WorkoutBuilder({ session }: { session: any }) {
       }
     }
 
-    alert("🔥 Plan przypisany pomyślnie!")
+    alert(isSelf ? "🔥 Plan zapisany! Znajdziesz go w Dzienniku." : "🔥 Plan przypisany pomyślnie!")
     setStep(1)
     setPlanName('')
     setDays([])
-    setSelectedClientId('')
+    setSelectedClientId(isTrainer ? '' : 'self')
     setSaving(false)
   }
 
@@ -193,8 +210,6 @@ export default function WorkoutBuilder({ session }: { session: any }) {
             </div>
           </div>
         )}
-
-
 
         {/* ================================== KROK 2 ================================== */}
         {step === 2 && (
@@ -258,7 +273,6 @@ export default function WorkoutBuilder({ session }: { session: any }) {
                       </div>
                     </div>
 
-
                     {/* LINK DO GIF-A / OBRAZKA */}
                     <div className="flex flex-col gap-3 rounded-2xl bg-black/20 border border-white/5 p-4">
                       <label className="text-sm font-bold text-white">🖼️ Link do GIF-a / obrazka (technika)</label>
@@ -304,8 +318,8 @@ export default function WorkoutBuilder({ session }: { session: any }) {
         {step === 3 && (
           <div className="animate-fade-in flex flex-col gap-8">
             <div className="flex flex-col gap-2">
-              <h1 className="text-4xl font-extrabold tracking-tight text-white">Przypisanie planu</h1>
-              <p className="text-zinc-400">Sprawdź strukturę i wybierz podopiecznego.</p>
+              <h1 className="text-4xl font-extrabold tracking-tight text-white">{isTrainer ? 'Przypisanie planu' : 'Zapis planu'}</h1>
+              <p className="text-zinc-400">{isTrainer ? 'Sprawdź strukturę i wybierz odbiorcę.' : 'Sprawdź strukturę. Plan zostanie zapisany dla Ciebie.'}</p>
             </div>
 
             <div className="rounded-3xl bg-black/30 border border-emerald-500/20 p-6 flex flex-col gap-6">
@@ -330,20 +344,23 @@ export default function WorkoutBuilder({ session }: { session: any }) {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <label className="text-xl font-bold text-white">Wybierz ucznia docelowego</label>
-              <select value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)} className={`${inputBase} text-lg`}>
-                <option value="">-- Wybierz podopiecznego --</option>
-                {activeClients.map(c => (
-                  <option key={c.client.id} value={c.client.id}>@{c.client.nickname}</option>
-                ))}
-              </select>
-            </div>
+            {isTrainer && (
+              <div className="flex flex-col gap-3">
+                <label className="text-xl font-bold text-white">Dla kogo jest ten plan?</label>
+                <select value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)} className={`${inputBase} text-lg`}>
+                  <option value="">-- Wybierz odbiorcę --</option>
+                  <option value="self">🙋 Dla siebie</option>
+                  {activeClients.map(c => (
+                    <option key={c.client.id} value={c.client.id}>@{c.client.nickname}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="flex justify-between items-center">
               <button onClick={() => setStep(2)} className={btnGhost}>⬅ Wróć do edycji</button>
               <button onClick={handleSavePlan} disabled={saving} className={`${btnPrimary} ${btnDisabled}`}>
-                {saving ? 'Wysyłanie na serwer...' : '🚀 Zatwierdź i Wyślij Plan!'}
+                {saving ? 'Zapisywanie...' : isTrainer ? '🚀 Zatwierdź i Wyślij Plan!' : '💾 Zapisz mój plan'}
               </button>
             </div>
           </div>
@@ -352,5 +369,3 @@ export default function WorkoutBuilder({ session }: { session: any }) {
     </div>
   )
 }
-
-

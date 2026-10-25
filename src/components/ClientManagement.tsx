@@ -8,7 +8,7 @@ export default function ClientManagement({ session }: { session: any }) {
   const [blockedClients, setBlockedClients] = useState<any[]>([])
 
   const fetchTrainerClients = async () => {
-    const { data } = await supabase.from('trainer_clients').select(`id, status, client:profiles!client_id(id, nickname)`).eq('trainer_id', session.user.id)
+    const { data } = await supabase.from('trainer_clients').select(`id, status, welcome_message, client:profiles!client_id(id, nickname)`).eq('trainer_id', session.user.id)
     if (data) {
       setPendingRequests(data.filter(req => req.status === 'pending'))
       setActiveClients(data.filter(req => req.status === 'active'))
@@ -19,20 +19,20 @@ export default function ClientManagement({ session }: { session: any }) {
   useEffect(() => { fetchTrainerClients() }, [])
 
   const acceptRequest = async (id: string) => { await supabase.from('trainer_clients').update({ status: 'active' }).eq('id', id); fetchTrainerClients() }
-  
-  const blockClient = async (id: string) => { 
-    if (window.confirm("Zablokować tego użytkownika? Nie będzie mógł wysyłać Ci zaproszeń.")) { 
-      await supabase.from('trainer_clients').update({ status: 'blocked' }).eq('id', id); 
-      fetchTrainerClients() 
-    } 
-  }
-  
-  const unblockClient = async (id: string) => { 
-    await supabase.from('trainer_clients').delete().eq('id', id); 
-    fetchTrainerClients() 
+
+  const blockClient = async (id: string) => {
+    if (window.confirm("Zablokować tego użytkownika? Nie będzie mógł wysyłać Ci zaproszeń.")) {
+      await supabase.from('trainer_clients').update({ status: 'blocked' }).eq('id', id);
+      fetchTrainerClients()
+    }
   }
 
-  // NOWE: Funkcja do zakończenia współpracy z aktywnym podopiecznym
+  const unblockClient = async (id: string) => {
+    await supabase.from('trainer_clients').delete().eq('id', id);
+    fetchTrainerClients()
+  }
+
+  // Funkcja do zakończenia współpracy z aktywnym podopiecznym
   const removeClient = async (id: string) => {
     if (window.confirm("Czy na pewno chcesz zakończyć współpracę z tym podopiecznym? Zniknie on z Twojej listy.")) {
       await supabase.from('trainer_clients').delete().eq('id', id);
@@ -52,12 +52,20 @@ export default function ClientManagement({ session }: { session: any }) {
         <h2 className="text-sm font-bold uppercase tracking-widest text-amber-400">Oczekujące zaproszenia ({pendingRequests.length})</h2>
         <div className="flex flex-col gap-4">
           {pendingRequests.map(req => (
-            <div key={req.id} className={`${glassCard} flex items-center justify-between gap-6 border-amber-500/20`}>
-              <p className="text-xl font-bold text-white">@{req.client.nickname}</p>
-              <div className="flex gap-3">
-                <button onClick={() => acceptRequest(req.id)} className={btnPrimarySm}>Akceptuj</button>
-                <button onClick={() => blockClient(req.id)} className={btnDanger}>Blokuj</button>
+            <div key={req.id} className={`${glassCard} flex flex-col gap-4 border-amber-500/20`}>
+              <div className="flex items-center justify-between gap-6">
+                <p className="text-xl font-bold text-white">@{req.client.nickname}</p>
+                <div className="flex gap-3">
+                  <button onClick={() => acceptRequest(req.id)} className={btnPrimarySm}>Akceptuj</button>
+                  <button onClick={() => blockClient(req.id)} className={btnDanger}>Blokuj</button>
+                </div>
               </div>
+              {req.welcome_message && (
+                <div className="rounded-2xl border border-white/5 bg-black/30 p-4">
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Wiadomość powitalna</p>
+                  <p className="text-white">{req.welcome_message}</p>
+                </div>
+              )}
             </div>
           ))}
           {pendingRequests.length === 0 && (
@@ -105,4 +113,3 @@ export default function ClientManagement({ session }: { session: any }) {
     </div>
   )
 }
-

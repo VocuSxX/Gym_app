@@ -2,19 +2,35 @@ import { useState } from 'react'
 import { supabase } from './supabaseClient'
 import { useNavigate } from 'react-router-dom'
 import { glassCard, btnPrimary, btnDisabled, inputBase, ambientBlobs } from './ui'
+import Banner from './components/Banner'
+
+const translateError = (msg: string) => {
+  const m = msg.toLowerCase()
+  if (m.includes('invalid login credentials')) return 'Nieprawidłowy e-mail lub hasło.'
+  if (m.includes('already registered')) return 'Konto z takim e-mailem już istnieje.'
+  if (m.includes('password should be at least')) return 'Hasło musi mieć co najmniej 6 znaków.'
+  if (m.includes('email not confirmed')) return 'Potwierdź e-mail, klikając link w wiadomości.'
+  if (m.includes('invalid email') || m.includes('unable to validate email')) return 'Podaj poprawny adres e-mail.'
+  if (m.includes('rate limit')) return 'Zbyt wiele prób. Spróbuj ponownie za chwilę.'
+  return msg
+}
 
 export default function Auth() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const navigate = useNavigate()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
+    setInfo('')
     setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
-      alert(error.message)
+      setError(translateError(error.message))
     } else {
       navigate('/dashboard')
     }
@@ -22,10 +38,21 @@ export default function Auth() {
   }
 
   const handleSignUp = async () => {
+    setError('')
+    setInfo('')
+    if (!email || !password) {
+      setError('Wpisz e-mail i hasło, aby założyć konto.')
+      return
+    }
     setLoading(true)
-    const { error } = await supabase.auth.signUp({ email, password })
-    if (error) alert(error.message)
-    else alert('Konto utworzone! Możesz się zalogować.')
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    if (error) {
+      setError(translateError(error.message))
+    } else if (data.session) {
+      navigate('/dashboard')
+    } else {
+      setInfo('Konto utworzone! Sprawdź skrzynkę e-mail i potwierdź adres, potem zaloguj się.')
+    }
     setLoading(false)
   }
 
@@ -43,6 +70,9 @@ export default function Auth() {
         </div>
 
         <form onSubmit={handleLogin} className={`${glassCard} p-8 flex flex-col gap-6`}>
+          <Banner type="error" message={error} />
+          <Banner type="success" message={info} />
+
           <div className="flex flex-col gap-4">
             <input
               type="email"

@@ -81,7 +81,7 @@ describe('ageFromBirth', () => {
   })
 
   // BŁĄD: w dniu urodzin wynik to 29 zamiast 30 (patrz BUGS.md)
-  it.fails('zwraca 30 lat w dniu urodzin 1996-10-25', () => {
+  it('zwraca 30 lat w dniu urodzin 1996-10-25', () => {
     expect(ageFromBirth('1996-10-25')).toBe(30)
   })
 })
