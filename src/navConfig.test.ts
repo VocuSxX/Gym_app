@@ -12,8 +12,15 @@ describe('navFor', () => {
     expect(allTabs('trainer')).toEqual(expect.arrayContaining(['intake_questions', 'clients']))
   })
 
-  it('user ma fridge i search', () => {
-    expect(allTabs('user')).toEqual(expect.arrayContaining(['fridge', 'search']))
+  it('user ma fridge, trening, trenera i postępy', () => {
+    expect(allTabs('user')).toEqual(expect.arrayContaining(['fridge', 'training', 'trainer', 'progress']))
+  })
+
+  it('stare osobne zakładki zostały scalone w sekcje', () => {
+    const tabs = allTabs('user')
+    for (const old of ['journal', 'plan_creator', 'plan_templates', 'my_trainer', 'search', 'friends', 'chat', 'challenges', 'stats', 'body', 'achievements']) {
+      expect(tabs).not.toContain(old)
+    }
   })
 
   it('nieznana rola dostaje menu usera', () => {

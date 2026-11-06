@@ -1,0 +1,87 @@
+import { inputBase } from '../ui'
+import { AMENITIES, type GymForm } from '../gymConfig'
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="font-bold text-white">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+// Pola profilu siłowni. Używane w ankiecie (basic -> details) i w panelu siłowni (all).
+export default function GymDetailsFields({ form, setForm, part }: {
+  form: GymForm
+  setForm: (f: GymForm) => void
+  part: 'basic' | 'details' | 'all'
+}) {
+  const set = (key: keyof GymForm, value: any) => setForm({ ...form, [key]: value })
+  const toggleAmenity = (a: string) =>
+    set('amenities', form.amenities.includes(a) ? form.amenities.filter(x => x !== a) : [...form.amenities, a])
+
+  return (
+    <div className="flex flex-col gap-6">
+      {part !== 'details' && (
+        <>
+          <Field label="Nazwa siłowni">
+            <input type="text" value={form.name} onChange={e => set('name', e.target.value)} className={inputBase} placeholder="np. Iron Gym" />
+          </Field>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Miasto">
+              <input type="text" value={form.city} onChange={e => set('city', e.target.value)} className={inputBase} placeholder="Warszawa" />
+            </Field>
+            <Field label="Adres">
+              <input type="text" value={form.address} onChange={e => set('address', e.target.value)} className={inputBase} placeholder="ul. Przykładowa 1" />
+            </Field>
+          </div>
+        </>
+      )}
+
+      {part !== 'basic' && (
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Field label="Telefon (opcjonalnie)">
+              <input type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} className={inputBase} placeholder="+48 123 456 789" />
+            </Field>
+            <Field label="E-mail kontaktowy (opcjonalnie)">
+              <input type="email" value={form.contact_email} onChange={e => set('contact_email', e.target.value)} className={inputBase} placeholder="kontakt@siłownia.pl" />
+            </Field>
+          </div>
+          <Field label="Strona WWW (opcjonalnie)">
+            <input type="url" value={form.website} onChange={e => set('website', e.target.value)} className={inputBase} placeholder="https://" />
+          </Field>
+          <Field label="Godziny otwarcia (opcjonalnie)">
+            <input type="text" value={form.opening_hours} onChange={e => set('opening_hours', e.target.value)} className={inputBase} placeholder="Pn–Pt 6:00–23:00, Sb–Nd 8:00–20:00" />
+          </Field>
+          <Field label="Opis (opcjonalnie)">
+            <textarea value={form.description} onChange={e => set('description', e.target.value)} className={`${inputBase} h-24 resize-none`} />
+          </Field>
+
+          <Field label="Udogodnienia">
+            <div className="flex flex-wrap gap-2">
+              {AMENITIES.map(a => {
+                const on = form.amenities.includes(a)
+                return (
+                  <button
+                    type="button"
+                    key={a}
+                    onClick={() => toggleAmenity(a)}
+                    className={`rounded-full border px-4 py-2 text-sm font-bold transition-all duration-200 active:scale-95 ${on ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400' : 'border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'}`}
+                  >
+                    {on && '✓ '}{a}
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
+
+          <label className="flex cursor-pointer items-center gap-4">
+            <input type="checkbox" checked={form.is_public} onChange={e => set('is_public', e.target.checked)} className="h-6 w-6 accent-emerald-500" />
+            <span className="text-zinc-400">Widoczna publicznie (ćwiczący mogą się do niej zapisać)</span>
+          </label>
+        </>
+      )}
+    </div>
+  )
+}

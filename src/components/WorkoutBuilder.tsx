@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import { toast } from '../notify'
 import { glassCard, btnPrimary, btnGhost, btnDisabled, inputBase } from '../ui'
+import Stepper from './Stepper'
+import Icon from './Icon'
 
 export default function WorkoutBuilder({ session, profile }: { session: any; profile: any }) {
   const isTrainer = profile?.role === 'trainer'
@@ -10,6 +13,9 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
   // Dane z bazy
   const [activeClients, setActiveClients] = useState<any[]>([])
   const [exercisesDb, setExercisesDb] = useState<any[]>([])
+  const [templates, setTemplates] = useState<any[]>([])
+  // Sprzęt siłowni, do której należy użytkownik (puste = brak informacji)
+  const [gymEquipment, setGymEquipment] = useState<string[]>([])
 
   // Stan Kreatora
   const [planName, setPlanName] = useState('')
@@ -35,8 +41,19 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
       const { data } = await supabase.from('exercises').select('*').order('name')
       if (data) setExercisesDb(data)
     }
+    const fetchTemplates = async () => {
+      const { data } = await supabase.from('plan_templates').select('id, name, data').eq('owner_id', session.user.id).order('created_at', { ascending: false })
+      if (data) setTemplates(data)
+    }
+    const fetchGymEquipment = async () => {
+      if (!profile?.gym_id) return
+      const { data } = await supabase.from('gyms').select('equipment').eq('id', profile.gym_id).maybeSingle()
+      if (data?.equipment) setGymEquipment(data.equipment)
+    }
     fetchClients()
+    fetchGymEquipment()
     fetchExercises()
+    fetchTemplates()
   }, [session])
 
   // --- LOGIKA KROKU 1: Wybór Dni ---
@@ -97,9 +114,32 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
     } : d))
   }
 
+  // --- SZABLONY ---
+  const applyTemplate = (id: string) => {
+    const t = templates.find(x => x.id === id)
+    if (!t) return
+    const tplDays = (t.data?.days || []) as { name: string; exercises: any[] }[]
+    setPlanName(t.name)
+    const mapped = tplDays.map(d => ({
+      id: Math.random().toString(),
+      name: d.name,
+      exercises: (d.exercises || []).map(ex => ({ id: Math.random().toString(), name: ex.name, image_url: ex.image_url || '', sets: ex.sets, reps: ex.reps, rir: ex.rir })),
+    }))
+    setDays(mapped)
+  }
+
+  const saveAsTemplate = async () => {
+    const payload = { days: days.map(d => ({ name: d.name, exercises: d.exercises.map(ex => ({ name: ex.name, sets: Number(ex.sets) || 1, reps: String(ex.reps), rir: String(ex.rir), image_url: ex.image_url || '' })) })) }
+    const { error } = await supabase.from('plan_templates').insert({ owner_id: session.user.id, name: planName, data: payload })
+    if (error) return toast.error('Nie udało się zapisać szablonu.')
+    toast.success('Zapisano jako szablon.')
+    const { data } = await supabase.from('plan_templates').select('id, name, data').eq('owner_id', session.user.id).order('created_at', { ascending: false })
+    if (data) setTemplates(data)
+  }
+
   // --- ZAPIS DO BAZY ---
   const handleSavePlan = async () => {
-    if (!selectedClientId) return alert("Wybierz odbiorcę planu z listy!")
+    if (!selectedClientId) return toast.error("Wybierz odbiorcę planu z listy.")
     setSaving(true)
 
     const isSelf = selectedClientId === 'self'
@@ -120,7 +160,7 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
 
     if (planError || !planData) {
       setSaving(false)
-      return alert("Błąd zapisu planu!")
+      return toast.error("Nie udało się zapisać planu.")
     }
 
     for (let i = 0; i < days.length; i++) {
@@ -144,7 +184,7 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
       }
     }
 
-    alert(isSelf ? "🔥 Plan zapisany! Znajdziesz go w Dzienniku." : "🔥 Plan przypisany pomyślnie!")
+    toast.success(isSelf ? "Plan zapisany. Znajdziesz go w Dzienniku." : "Plan przypisany.")
     setStep(1)
     setPlanName('')
     setDays([])
@@ -155,19 +195,7 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
   return (
     <div className="max-w-5xl mx-auto w-full pb-20 flex flex-col gap-8">
 
-      {/* STEPPER: gruby pasek postępu w stylu Duolingo */}
-      <div className="flex flex-col gap-3">
-        <div className="flex gap-3">
-          {[1, 2, 3].map(n => (
-            <div key={n} className="h-4 flex-1 rounded-full bg-white/10 overflow-hidden">
-              <div className={`h-full rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/40 transition-all duration-500 ${step >= n ? 'w-full' : 'w-0'}`} />
-            </div>
-          ))}
-        </div>
-        <p className="text-sm font-bold uppercase tracking-widest text-zinc-400">
-          Krok {step} z 3 · <span className="text-emerald-400">{STEP_LABELS[step - 1]}</span>
-        </p>
-      </div>
+      <Stepper step={step} labels={STEP_LABELS} />
 
       <div className={`${glassCard} p-8 flex flex-col gap-8`}>
 
@@ -184,14 +212,24 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
               <input type="text" value={planName} onChange={e => setPlanName(e.target.value)} className={`${inputBase} text-lg`} placeholder="np. Hipertrofia - Blok A" />
             </div>
 
+            {templates.length > 0 && (
+              <div className="flex flex-col gap-3">
+                <label className="font-bold text-white">Zacznij od szablonu (opcjonalnie)</label>
+                <select defaultValue="" onChange={e => { if (e.target.value) applyTemplate(e.target.value) }} className={inputBase}>
+                  <option value="">-- Wybierz szablon --</option>
+                  {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            )}
+
             <div className="flex flex-col gap-4">
               <label className="font-bold text-white">Dni treningowe</label>
               <div className="flex flex-wrap gap-3">
                 {WEEKDAYS.map(day => {
                   const isSelected = days.find(d => d.name === day)
                   return (
-                    <button key={day} onClick={() => toggleDay(day)} className={`px-6 py-3 rounded-2xl font-bold border transition-all duration-200 hover:-translate-y-1 active:translate-y-1 active:scale-95 ${isSelected ? 'bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-500/25' : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white'}`}>
-                      {day} {isSelected && '✓'}
+                    <button key={day} onClick={() => toggleDay(day)} className={`px-6 py-3 rounded-2xl font-bold border transition-all duration-200 active:scale-[.97] ${isSelected ? 'bg-accent-500 border-accent-400 text-white' : 'bg-zinc-800 border-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'}`}>
+                      {day}
                     </button>
                   )
                 })}
@@ -200,12 +238,12 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
 
             <div className="flex justify-end">
               <button onClick={() => {
-                if(!planName) return alert("Podaj nazwę planu!")
-                if(days.length === 0) return alert("Wybierz chociaż jeden dzień!")
+                if(!planName) return toast.error("Podaj nazwę planu.")
+                if(days.length === 0) return toast.error("Wybierz chociaż jeden dzień.")
                 setActiveDayId(days[0].id)
                 setStep(2)
               }} className={btnPrimary}>
-                Dalej ➔
+                Dalej<Icon name="arrow-right" size={16} />
               </button>
             </div>
           </div>
@@ -222,9 +260,9 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
             {/* Zakładki dni (pigułki) */}
             <div className="flex gap-3 overflow-x-auto pb-2">
               {days.map(day => (
-                <button key={day.id} onClick={() => setActiveDayId(day.id)} className={`px-5 py-3 rounded-2xl font-bold whitespace-nowrap border transition-all duration-200 active:scale-95 ${activeDayId === day.id ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 shadow-lg shadow-emerald-500/10' : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white'}`}>
+                <button key={day.id} onClick={() => setActiveDayId(day.id)} className={`px-5 py-3 rounded-2xl font-bold whitespace-nowrap border transition-all duration-200 active:scale-[.97] ${activeDayId === day.id ? 'bg-accent-500/15 border-accent-500/40 text-accent-400' : 'bg-zinc-800 border-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'}`}>
                   {day.name}
-                  <span className="ml-2 rounded-full bg-black/30 px-2 py-0.5 text-xs">{day.exercises.length}</span>
+                  <span className="ml-2 rounded-full bg-zinc-950 px-2 py-0.5 text-xs">{day.exercises.length}</span>
                 </button>
               ))}
             </div>
@@ -234,21 +272,21 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
               <div key={day.id} className="flex flex-col gap-6">
 
                 {day.exercises.length === 0 && (
-                  <div className="rounded-3xl border border-dashed border-white/10 bg-black/20 p-10 text-center text-zinc-400">
+                  <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950 p-10 text-center text-zinc-400">
                     Ten dzień jest pusty. Dodaj pierwsze ćwiczenie poniżej.
                   </div>
                 )}
 
                 {day.exercises.map((ex, index) => (
-                  <div key={ex.id} className="rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 p-6 shadow-2xl flex flex-col gap-6">
+                  <div key={ex.id} className="rounded-2xl bg-zinc-900 border border-zinc-800 p-6 flex flex-col gap-6">
                     <div className="flex flex-col md:flex-row gap-6 md:items-center">
                       <div className="flex md:flex-col gap-2">
-                        <button onClick={() => moveExercise(day.id, index, 'up')} disabled={index === 0} className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 text-zinc-400 transition-all duration-200 hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-30 disabled:pointer-events-none">⬆️</button>
-                        <button onClick={() => moveExercise(day.id, index, 'down')} disabled={index === day.exercises.length - 1} className="h-9 w-9 rounded-xl bg-white/5 border border-white/10 text-zinc-400 transition-all duration-200 hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-30 disabled:pointer-events-none">⬇️</button>
+                        <button onClick={() => moveExercise(day.id, index, 'up')} disabled={index === 0} className="h-9 w-9 rounded-xl bg-zinc-800 border border-zinc-800 text-zinc-400 transition-all duration-200 hover:bg-zinc-700 hover:text-white active:scale-[.97] disabled:opacity-30 disabled:pointer-events-none"><Icon name="chevron-up" size={16} /></button>
+                        <button onClick={() => moveExercise(day.id, index, 'down')} disabled={index === day.exercises.length - 1} className="h-9 w-9 rounded-xl bg-zinc-800 border border-zinc-800 text-zinc-400 transition-all duration-200 hover:bg-zinc-700 hover:text-white active:scale-[.97] disabled:opacity-30 disabled:pointer-events-none"><Icon name="chevron-down" size={16} /></button>
                       </div>
 
                       {ex.image_url && (
-                        <img src={ex.image_url} alt={ex.name} className="h-16 w-16 rounded-2xl object-cover border border-white/10 shadow-lg" />
+                        <img src={ex.image_url} alt={ex.name} className="h-16 w-16 rounded-2xl object-cover border border-zinc-800" />
                       )}
 
                       <div className="flex-1">
@@ -269,13 +307,13 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
                           <label className="text-xs font-bold uppercase tracking-wide text-zinc-400 text-center">RIR</label>
                           <input type="text" value={ex.rir} onChange={e => updateExercise(day.id, ex.id, 'rir', e.target.value)} className={`${inputBase} !w-20 text-center !px-2`} />
                         </div>
-                        <button onClick={() => removeExercise(day.id, ex.id)} className="h-12 w-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 transition-all duration-200 hover:bg-red-500/20 active:scale-95">✕</button>
+                        <button onClick={() => removeExercise(day.id, ex.id)} className="h-12 w-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 transition-all duration-200 hover:bg-red-500/20 active:scale-[.97]"><Icon name="x" size={18} /></button>
                       </div>
                     </div>
 
                     {/* LINK DO GIF-A / OBRAZKA */}
-                    <div className="flex flex-col gap-3 rounded-2xl bg-black/20 border border-white/5 p-4">
-                      <label className="text-sm font-bold text-white">🖼️ Link do GIF-a / obrazka (technika)</label>
+                    <div className="flex flex-col gap-3 rounded-2xl bg-zinc-950 border border-zinc-800 p-4">
+                      <label className="text-sm font-bold text-white">Link do GIF-a / obrazka (technika)</label>
                       <input
                         type="url"
                         value={ex.image_url || ''}
@@ -284,14 +322,14 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
                         className={inputBase}
                       />
                       {ex.image_url && (
-                        <img src={ex.image_url} alt="Podgląd" className="h-28 w-fit rounded-2xl object-cover border border-white/10" />
+                        <img src={ex.image_url} alt="Podgląd" className="h-28 w-fit rounded-2xl object-cover border border-zinc-800" />
                       )}
                     </div>
                   </div>
                 ))}
 
                 {/* Słownik - Dodawanie ćwiczenia */}
-                <div className="rounded-3xl border border-dashed border-emerald-500/30 bg-emerald-500/5 p-6 flex flex-col gap-3">
+                <div className="rounded-2xl border border-dashed border-accent-500/30 bg-accent-500/5 p-6 flex flex-col gap-3">
                   <label className="font-bold text-white">Dodaj ćwiczenie z bazy</label>
                   <select onChange={e => {
                     const selectedEx = exercisesDb.find(dbEx => dbEx.id === e.target.value)
@@ -300,7 +338,7 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
                   }} className={inputBase}>
                     <option value="">+ Wybierz ćwiczenie...</option>
                     {exercisesDb.map(dbEx => (
-                      <option key={dbEx.id} value={dbEx.id}>{dbEx.name}</option>
+                      <option key={dbEx.id} value={dbEx.id}>{dbEx.name}{gymEquipment.length > 0 && dbEx.equipment && !gymEquipment.includes(dbEx.equipment) ? ' (brak w Twojej siłowni)' : ''}</option>
                     ))}
                   </select>
                 </div>
@@ -308,8 +346,8 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
             ))}
 
             <div className="flex justify-between items-center">
-              <button onClick={() => setStep(1)} className={btnGhost}>⬅ Wstecz</button>
-              <button onClick={() => setStep(3)} className={btnPrimary}>Podsumowanie ➔</button>
+              <button onClick={() => setStep(1)} className={btnGhost}><Icon name="arrow-left" size={16} />Wstecz</button>
+              <button onClick={() => setStep(3)} className={btnPrimary}>Podsumowanie<Icon name="arrow-right" size={16} /></button>
             </div>
           </div>
         )}
@@ -322,17 +360,17 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
               <p className="text-zinc-400">{isTrainer ? 'Sprawdź strukturę i wybierz odbiorcę.' : 'Sprawdź strukturę. Plan zostanie zapisany dla Ciebie.'}</p>
             </div>
 
-            <div className="rounded-3xl bg-black/30 border border-emerald-500/20 p-6 flex flex-col gap-6">
+            <div className="rounded-2xl bg-zinc-950 border border-accent-500/20 p-6 flex flex-col gap-6">
               <h2 className="text-2xl font-extrabold text-white">{planName}</h2>
               <div className="flex flex-col gap-6">
                 {days.map(day => (
                   <div key={day.id} className="flex flex-col gap-3">
-                    <h3 className="font-bold text-emerald-400 uppercase tracking-widest text-sm">{day.name}</h3>
+                    <h3 className="font-bold text-accent-400 text-sm">{day.name}</h3>
                     {day.exercises.length === 0 ? <p className="text-zinc-400 text-sm italic">Brak ćwiczeń</p> : (
                       <ul className="flex flex-col gap-3">
                         {day.exercises.map((ex, idx) => (
-                          <li key={idx} className="flex items-center gap-4 rounded-2xl bg-white/5 border border-white/10 p-3">
-                            {ex.image_url && <img src={ex.image_url} alt={ex.name} className="h-12 w-12 rounded-xl object-cover border border-white/10" />}
+                          <li key={idx} className="flex items-center gap-4 rounded-2xl bg-zinc-800 border border-zinc-800 p-3">
+                            {ex.image_url && <img src={ex.image_url} alt={ex.name} className="h-12 w-12 rounded-xl object-cover border border-zinc-800" />}
                             <span className="flex-1 font-semibold text-white">{idx + 1}. {ex.name}</span>
                             <span className="text-sm text-zinc-400">{ex.sets} serie · {ex.reps} powt · RIR {ex.rir}</span>
                           </li>
@@ -349,7 +387,7 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
                 <label className="text-xl font-bold text-white">Dla kogo jest ten plan?</label>
                 <select value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)} className={`${inputBase} text-lg`}>
                   <option value="">-- Wybierz odbiorcę --</option>
-                  <option value="self">🙋 Dla siebie</option>
+                  <option value="self">Dla siebie</option>
                   {activeClients.map(c => (
                     <option key={c.client.id} value={c.client.id}>@{c.client.nickname}</option>
                   ))}
@@ -358,9 +396,10 @@ export default function WorkoutBuilder({ session, profile }: { session: any; pro
             )}
 
             <div className="flex justify-between items-center">
-              <button onClick={() => setStep(2)} className={btnGhost}>⬅ Wróć do edycji</button>
+              <button onClick={() => setStep(2)} className={btnGhost}><Icon name="arrow-left" size={16} />Wróć do edycji</button>
+              <button type="button" onClick={saveAsTemplate} className={btnGhost}><Icon name="layers" size={16} />Zapisz jako szablon</button>
               <button onClick={handleSavePlan} disabled={saving} className={`${btnPrimary} ${btnDisabled}`}>
-                {saving ? 'Zapisywanie...' : isTrainer ? '🚀 Zatwierdź i Wyślij Plan!' : '💾 Zapisz mój plan'}
+                {saving ? 'Zapisywanie...' : isTrainer ? 'Zatwierdź i wyślij plan' : 'Zapisz mój plan'}
               </button>
             </div>
           </div>

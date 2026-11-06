@@ -1,0 +1,73 @@
+import { supabase } from '../supabaseClient'
+import { navFor, ROLE_LABELS } from '../navConfig'
+
+export default function Sidebar({ profile, activeTab, setActiveTab, open, onClose }: any) {
+  const role: string | undefined = profile?.role
+  const groups = navFor(role)
+
+  const navBtn = (tab: string, icon: string, label: string) => {
+    const isActive = activeTab === tab
+    return (
+      <button
+        key={tab}
+        onClick={() => setActiveTab(tab)}
+        className={`group flex items-center gap-3 text-left px-3 py-2.5 rounded-2xl font-semibold transition-all duration-200 active:scale-95 ${
+          isActive
+            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-lg shadow-emerald-500/10'
+            : 'text-zinc-400 border border-transparent hover:bg-white/5 hover:text-white hover:translate-x-1'
+        }`}
+      >
+        <span className={`flex h-9 w-9 items-center justify-center rounded-xl text-lg transition-colors duration-200 ${isActive ? 'bg-emerald-500/20' : 'bg-white/5 group-hover:bg-white/10'}`}>
+          {icon}
+        </span>
+        {label}
+      </button>
+    )
+  }
+
+  return (
+    <>
+      {/* Tło za wysuwanym menu (tylko telefon) */}
+      {open && <div className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm md:hidden" onClick={onClose} />}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-72 bg-zinc-900 border-r border-white/5 p-6 flex flex-col gap-6 shadow-2xl transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500 text-xl shadow-lg shadow-emerald-500/25">
+            🏋️
+          </div>
+          <h2 className="text-2xl font-extrabold tracking-tight text-white">MyGym Pro</h2>
+        </div>
+
+        {profile?.nickname && (
+          <div className="flex items-center gap-3 rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-500/20 text-lg">
+              {role === 'gym' ? '🏢' : role === 'trainer' ? '🎓' : '💪'}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate font-bold text-white">@{profile.nickname}</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">{ROLE_LABELS[role || 'user'] || 'Ćwiczący'}</p>
+            </div>
+          </div>
+        )}
+
+        <nav className="flex flex-1 flex-col gap-5 overflow-y-auto">
+          {groups.map(group => (
+            <div key={group.label} className="flex flex-col gap-1">
+              <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-widest text-zinc-400">{group.label}</p>
+              {group.items.map(item => navBtn(item.tab, item.icon, item.label))}
+            </div>
+          ))}
+        </nav>
+
+        <button
+          onClick={() => supabase.auth.signOut()}
+          className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left font-semibold text-zinc-400 transition-all duration-200 hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 active:scale-95"
+        >
+          🚪 Wyloguj
+        </button>
+      </aside>
+    </>
+  )
+}

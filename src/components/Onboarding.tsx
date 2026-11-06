@@ -1,12 +1,44 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { glassCard, btnPrimary, btnDisabled, inputBase, ambientBlobs } from '../ui'
+import { glassCard, btnPrimary, btnGhost, btnDisabled, inputBase } from '../ui'
+import { ageFromBirth, ACTIVITY } from '../health'
+import { emptyGymForm, type GymForm } from '../gymConfig'
 import Banner from './Banner'
-import { ageFromBirth } from '../health'
+import AuthShell from './AuthShell'
+import GymDetailsFields from './GymDetailsFields'
+import Icon from './Icon'
 
+const LABELS_PERSON = ['Dane logowania', 'O Tobie', 'Twój cel']
+const LABELS_GYM = ['Dane logowania', 'O siłowni', 'Szczegóły']
+
+const LEVELS = [
+  { value: 'beginner', label: 'Początkujący' },
+  { value: 'intermediate', label: 'Średniozaawansowany' },
+  { value: 'advanced', label: 'Zaawansowany' },
+]
+const GOALS = [
+  { value: 'lose', label: 'Redukcja' },
+  { value: 'maintain', label: 'Utrzymanie' },
+  { value: 'gain', label: 'Masa' },
+]
+const ROLES = [
+  { value: 'user', label: 'Ćwiczący' },
+  { value: 'trainer', label: 'Trener' },
+  { value: 'gym', label: 'Siłownia' },
+]
+
+const pill = (active: boolean) =>
+  `rounded-2xl border px-4 py-3 font-bold transition-all duration-200 active:scale-[.97] ${active ? 'border-accent-500/40 bg-accent-500/15 text-accent-400' : 'border-zinc-800 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white'}`
+
+// Zamiana znaków specjalnych ilike (% i _), żeby nick był porównywany dosłownie
+const escapeLike = (s: string) => s.replace(/[\\%_]/g, m => '\\' + m)
+
+// Kroki 2 i 3 rejestracji (krok 1 = Register). Siłownia ma własną ścieżkę bez danych osobowych.
 export default function Onboarding({ session, profile, fetchProfile }: { session: any; profile: any; fetchProfile: () => Promise<void> }) {
+  const isAdmin = profile?.role === 'admin'
+  const [step, setStep] = useState(2)
+  const [role, setRole] = useState<string>(profile?.role || 'user')
   const [form, setForm] = useState({
-    role: profile?.role || 'user',
     nickname: profile?.nickname || '',
     first_name: profile?.first_name || '',
     last_name: profile?.last_name || '',
@@ -16,139 +48,242 @@ export default function Onboarding({ session, profile, fetchProfile }: { session
     weight_kg: profile?.weight_kg ? String(profile.weight_kg) : '',
     activity_level: profile?.activity_level || 'moderate',
     goal: profile?.goal || 'maintain',
+    training_level: profile?.training_level || '',
+    training_years: profile?.training_years != null ? String(profile.training_years) : '0',
   })
+  const [gymForm, setGymForm] = useState<GymForm>(emptyGymForm)
   const [saving, setSaving] = useState(false)
+  const [checking, setChecking] = useState(false)
   const [error, setError] = useState('')
 
+  const isGym = role === 'gym'
+  const labels = isGym ? LABELS_GYM : LABELS_PERSON
   const set = (field: string, value: string) => setForm({ ...form, [field]: value })
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-
+  // ---------- Walidacja ----------
+  const validateStep2 = (): string => {
+    if (form.nickname.trim().length < 3) return 'Nickname musi mieć co najmniej 3 znaki.'
+    if (isGym) {
+      if (!gymForm.name.trim()) return 'Podaj nazwę siłowni.'
+      return ''
+    }
     const height = parseInt(form.height_cm)
     const weight = parseFloat(form.weight_kg)
     const age = form.birth_date ? ageFromBirth(form.birth_date) : 0
-      ? Math.floor((Date.now() - new Date(form.birth_date).getTime()) / (365.25 * 24 * 3600 * 1000))
-      : 0
+    if (!form.first_name.trim() || !form.last_name.trim()) return 'Podaj imię i nazwisko.'
+    if (!form.gender) return 'Wybierz płeć (potrzebna do kalkulatora kalorii).'
+    if (!form.birth_date || age < 13 || age > 100) return 'Podaj poprawną datę urodzenia (min. 13 lat).'
+    if (!height || height < 100 || height > 250) return 'Wzrost musi mieścić się w zakresie 100–250 cm.'
+    if (!weight || weight < 30 || weight > 300) return 'Waga musi mieścić się w zakresie 30–300 kg.'
+    return ''
+  }
 
-    if (form.nickname.trim().length < 3) return setError('Nickname musi mieć co najmniej 3 znaki.')
-    if (!form.first_name.trim() || !form.last_name.trim()) return setError('Podaj imię i nazwisko.')
-    if (!form.gender) return setError('Wybierz płeć (potrzebna do kalkulatora kalorii).')
-    if (!form.birth_date || age < 13 || age > 100) return setError('Podaj poprawną datę urodzenia (min. 13 lat).')
-    if (!height || height < 100 || height > 250) return setError('Wzrost musi mieścić się w zakresie 100–250 cm.')
-    if (!weight || weight < 30 || weight > 300) return setError('Waga musi mieścić się w zakresie 30–300 kg.')
+  const validateStep3 = (): string => {
+    if (isGym) {
+      if (gymForm.contact_email && !gymForm.contact_email.includes('@')) return 'Podaj poprawny e-mail kontaktowy.'
+      return ''
+    }
+    const years = parseInt(form.training_years)
+    if (!form.training_level) return 'Wybierz swój staż treningowy.'
+    if (isNaN(years) || years < 0 || years > 60) return 'Podaj liczbę lat treningu (0–60).'
+    return ''
+  }
+
+  // ---------- Krok 2 -> 3 (z wczesnym sprawdzeniem nicku) ----------
+  const goNext = async () => {
+    setError('')
+    const err = validateStep2()
+    if (err) return setError(err)
+
+    setChecking(true)
+    const { data: taken } = await supabase
+      .from('profiles')
+      .select('id')
+      .ilike('nickname', escapeLike(form.nickname.trim()))
+      .neq('id', session.user.id)
+      .maybeSingle()
+    setChecking(false)
+    if (taken) return setError('Ten nickname jest już zajęty. Wybierz inny.')
+
+    setStep(3)
+  }
+
+  // ---------- Zapis ----------
+  const finish = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    const err = validateStep3()
+    if (err) return setError(err)
 
     setSaving(true)
-    const { error: dbError } = await supabase
-      .from('profiles')
-      .update({
-        role: form.role,
-        nickname: form.nickname.trim(),
-        first_name: form.first_name.trim(),
-        last_name: form.last_name.trim(),
-        gender: form.gender,
-        birth_date: form.birth_date,
-        height_cm: height,
-        weight_kg: weight,
-        activity_level: form.activity_level,
-        goal: form.goal,
-        onboarding_done: true,
-      })
-      .eq('id', session.user.id)
+    const me = session.user.id
+    const nickError = (code?: string) => (code === '23505' ? 'Ten nickname jest już zajęty. Wybierz inny.' : '')
 
-    if (dbError) {
-      setError(dbError.code === '23505' ? 'Ten nickname jest już zajęty. Wybierz inny.' : 'Nie udało się zapisać profilu: ' + dbError.message)
-      setSaving(false)
-      return
+    if (isGym) {
+      // 1) rola + nick (rola 'gym' jest wymagana przez politykę tworzenia siłowni)
+      const { error: e1 } = await supabase.from('profiles').update({ role: 'gym', nickname: form.nickname.trim() }).eq('id', me)
+      if (e1) { setError(nickError(e1.code) || 'Nie udało się zapisać profilu: ' + e1.message); setSaving(false); return }
+
+      // 2) siłownia (update, jeśli ankieta była już raz przerwana po tym kroku)
+      const payload = { ...gymForm, name: gymForm.name.trim() }
+      const { data: existing } = await supabase.from('gyms').select('id').eq('owner_id', me).maybeSingle()
+      const { error: e2 } = existing
+        ? await supabase.from('gyms').update(payload).eq('id', existing.id)
+        : await supabase.from('gyms').insert({ ...payload, owner_id: me })
+      if (e2) { setError('Nie udało się zapisać siłowni: ' + e2.message); setSaving(false); return }
+
+      // 3) koniec ankiety
+      const { error: e3 } = await supabase.from('profiles').update({ onboarding_done: true }).eq('id', me)
+      if (e3) { setError('Nie udało się zakończyć ankiety: ' + e3.message); setSaving(false); return }
+    } else {
+      const { error: dbError } = await supabase
+        .from('profiles')
+        .update({
+          ...(isAdmin ? {} : { role }),
+          nickname: form.nickname.trim(),
+          first_name: form.first_name.trim(),
+          last_name: form.last_name.trim(),
+          gender: form.gender,
+          birth_date: form.birth_date,
+          height_cm: parseInt(form.height_cm),
+          weight_kg: parseFloat(form.weight_kg),
+          activity_level: form.activity_level,
+          goal: form.goal,
+          training_level: form.training_level,
+          training_years: parseInt(form.training_years),
+          onboarding_done: true,
+        })
+        .eq('id', me)
+      if (dbError) { setError(nickError(dbError.code) || 'Nie udało się zapisać profilu: ' + dbError.message); setSaving(false); return }
     }
 
     await fetchProfile()
     setSaving(false)
   }
 
+  // ---------- Widok ----------
+  const title = step === 2 ? (isGym ? 'O Twojej siłowni' : 'Opowiedz o sobie') : (isGym ? 'Szczegóły siłowni' : 'Twój cel i staż')
+  const subtitle = step === 2
+    ? (isGym ? 'Podstawowe dane, które zobaczą ćwiczący.' : 'Te dane posłużą do wyliczenia Twojego zapotrzebowania kalorycznego.')
+    : (isGym ? 'Wszystko poza nazwą jest opcjonalne i zmienisz to później w panelu.' : 'Dzięki temu dopasujemy dla Ciebie treningi i kalorie.')
+
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-zinc-950 text-white p-4 md:p-6">
-      {ambientBlobs.map((cls, i) => <div key={i} className={cls} />)}
-
-      <form onSubmit={handleSubmit} className={`${glassCard} relative z-10 w-full max-w-2xl p-6 md:p-8 flex flex-col gap-6 animate-fade-in`}>
-        <div className="flex flex-col gap-2">
-          <p className="text-sm font-bold uppercase tracking-widest text-emerald-400">Pierwsze kroki</p>
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white">Uzupełnij swój profil</h1>
-          <p className="text-zinc-400">Te dane posłużą do wyliczenia Twojego zapotrzebowania kalorycznego.</p>
-        </div>
-
+    <AuthShell title={title} subtitle={subtitle} wide step={step} labels={labels}>
+      <form onSubmit={finish} className={`${glassCard} p-6 md:p-8 flex flex-col gap-6`}>
         <Banner type="error" message={error} />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex flex-col gap-2 md:col-span-2">
-            <label className="font-bold text-white">Typ konta</label>
-            <select value={form.role} onChange={e => set('role', e.target.value)} className={inputBase}>
-              <option value="user">🏋️ Ćwiczący</option>
-              <option value="trainer">🎓 Trener</option>
-              <option value="gym">🏢 Siłownia (właściciel)</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-2 md:col-span-2">
-            <label className="font-bold text-white">Nickname</label>
-            <input type="text" value={form.nickname} onChange={e => set('nickname', e.target.value)} className={inputBase} placeholder="np. silacz92" />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="font-bold text-white">Imię</label>
-            <input type="text" value={form.first_name} onChange={e => set('first_name', e.target.value)} className={inputBase} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="font-bold text-white">Nazwisko</label>
-            <input type="text" value={form.last_name} onChange={e => set('last_name', e.target.value)} className={inputBase} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="font-bold text-white">Płeć</label>
-            <select value={form.gender} onChange={e => set('gender', e.target.value)} className={inputBase}>
-              <option value="">-- Wybierz --</option>
-              <option value="male">Mężczyzna</option>
-              <option value="female">Kobieta</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="font-bold text-white">Data urodzenia</label>
-            <input type="date" value={form.birth_date} onChange={e => set('birth_date', e.target.value)} className={inputBase} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="font-bold text-white">Wzrost (cm)</label>
-            <input type="number" value={form.height_cm} onChange={e => set('height_cm', e.target.value)} className={inputBase} placeholder="180" />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="font-bold text-white">Waga (kg)</label>
-            <input type="number" step="0.1" value={form.weight_kg} onChange={e => set('weight_kg', e.target.value)} className={inputBase} placeholder="75" />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="font-bold text-white">Aktywność</label>
-            <select value={form.activity_level} onChange={e => set('activity_level', e.target.value)} className={inputBase}>
-              <option value="sedentary">Siedzący tryb życia</option>
-              <option value="light">Lekka (1–2 treningi / tydz.)</option>
-              <option value="moderate">Umiarkowana (3–4 treningi / tydz.)</option>
-              <option value="active">Wysoka (5–6 treningów / tydz.)</option>
-              <option value="very_active">Bardzo wysoka (codziennie / praca fizyczna)</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label className="font-bold text-white">Cel</label>
-            <select value={form.goal} onChange={e => set('goal', e.target.value)} className={inputBase}>
-              <option value="lose">Redukcja</option>
-              <option value="maintain">Utrzymanie wagi</option>
-              <option value="gain">Masa</option>
-            </select>
-          </div>
-        </div>
+        {/* ===================== KROK 2 ===================== */}
+        {step === 2 && (
+          <>
+            {!isAdmin && (
+              <div className="flex flex-col gap-2">
+                <label className="font-bold text-white">Typ konta</label>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {ROLES.map(r => (
+                    <button type="button" key={r.value} onClick={() => setRole(r.value)} className={pill(role === r.value)}>{r.label}</button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-        <button type="submit" disabled={saving} className={`${btnPrimary} ${btnDisabled}`}>
-          {saving ? 'Zapisywanie...' : 'Zapisz i zaczynamy'}
-        </button>
+            <div className="flex flex-col gap-2">
+              <label className="font-bold text-white">Nickname</label>
+              <input type="text" value={form.nickname} onChange={e => set('nickname', e.target.value)} className={inputBase} placeholder="np. silacz92" />
+            </div>
 
-        <button type="button" onClick={() => supabase.auth.signOut()} className="text-sm text-zinc-400 transition-colors duration-200 hover:text-white">
-          Wyloguj
-        </button>
+            {isGym ? (
+              <GymDetailsFields form={gymForm} setForm={setGymForm} part="basic" />
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="flex flex-col gap-2">
+                  <label className="font-bold text-white">Imię</label>
+                  <input type="text" value={form.first_name} onChange={e => set('first_name', e.target.value)} className={inputBase} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="font-bold text-white">Nazwisko</label>
+                  <input type="text" value={form.last_name} onChange={e => set('last_name', e.target.value)} className={inputBase} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="font-bold text-white">Płeć</label>
+                  <select value={form.gender} onChange={e => set('gender', e.target.value)} className={inputBase}>
+                    <option value="">-- Wybierz --</option>
+                    <option value="male">Mężczyzna</option>
+                    <option value="female">Kobieta</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="font-bold text-white">Data urodzenia</label>
+                  <input type="date" value={form.birth_date} onChange={e => set('birth_date', e.target.value)} className={inputBase} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="font-bold text-white">Wzrost (cm)</label>
+                  <input type="number" value={form.height_cm} onChange={e => set('height_cm', e.target.value)} className={inputBase} placeholder="180" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="font-bold text-white">Waga (kg)</label>
+                  <input type="number" step="0.1" value={form.weight_kg} onChange={e => set('weight_kg', e.target.value)} className={inputBase} placeholder="75" />
+                </div>
+              </div>
+            )}
+
+            <button type="button" onClick={goNext} disabled={checking} className={`${btnPrimary} ${btnDisabled}`}>
+              {checking ? 'Sprawdzanie...' : 'Dalej'}
+            </button>
+
+            <button type="button" onClick={() => supabase.auth.signOut()} className="text-sm text-zinc-400 transition-colors duration-200 hover:text-white">
+              Wyloguj
+            </button>
+          </>
+        )}
+
+        {/* ===================== KROK 3 ===================== */}
+        {step === 3 && (
+          <>
+            {isGym ? (
+              <GymDetailsFields form={gymForm} setForm={setGymForm} part="details" />
+            ) : (
+              <>
+                <div className="flex flex-col gap-2">
+                  <label className="font-bold text-white">Cel</label>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {GOALS.map(g => (
+                      <button type="button" key={g.value} onClick={() => set('goal', g.value)} className={pill(form.goal === g.value)}>{g.label}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="font-bold text-white">Aktywność w ciągu tygodnia</label>
+                  <select value={form.activity_level} onChange={e => set('activity_level', e.target.value)} className={inputBase}>
+                    {Object.entries(ACTIVITY).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="font-bold text-white">Staż treningowy</label>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {LEVELS.map(l => (
+                      <button type="button" key={l.value} onClick={() => set('training_level', l.value)} className={pill(form.training_level === l.value)}>{l.label}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="font-bold text-white">Ile lat trenujesz?</label>
+                  <input type="number" min="0" max="60" value={form.training_years} onChange={e => set('training_years', e.target.value)} className={inputBase} />
+                </div>
+              </>
+            )}
+
+            <div className="flex items-center justify-between gap-4">
+              <button type="button" onClick={() => { setError(''); setStep(2) }} className={btnGhost}><Icon name="arrow-left" size={16} />Wstecz</button>
+              <button type="submit" disabled={saving} className={`${btnPrimary} ${btnDisabled}`}>
+                {saving ? 'Zapisywanie...' : 'Zapisz i zaczynamy'}
+              </button>
+            </div>
+          </>
+        )}
       </form>
-    </div>
+    </AuthShell>
   )
 }

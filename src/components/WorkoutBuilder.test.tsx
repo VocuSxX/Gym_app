@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import WorkoutBuilder from './WorkoutBuilder'
 import { setResult, resetMock, callsOf } from '../test/supabaseMock'
+import { getToasts, dismissToast } from '../notify'
 
 vi.mock('../supabaseClient', async () => {
   const { supabaseMock } = await import('../test/supabaseMock')
@@ -27,7 +28,7 @@ describe('WorkoutBuilder', () => {
     resetMock()
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-25T12:00:00'))
-    window.alert = vi.fn()
+    getToasts().forEach(t => dismissToast(t.id))
     setResult('exercises', {
       data: [{ id: 'e1', name: 'Przysiad', image_url: '' }],
     })
@@ -75,7 +76,7 @@ describe('WorkoutBuilder', () => {
     await goToSummary()
 
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'self' } })
-    fireEvent.click(screen.getByRole('button', { name: /Zatwierdź i Wyślij Plan/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Zatwierdź i wyślij plan/ }))
 
     await vi.waitFor(() => expect(callsOf('workout_plans', 'insert')).toHaveLength(1))
     expect(callsOf('workout_plans', 'insert')[0].args[0]).toEqual(
@@ -89,7 +90,7 @@ describe('WorkoutBuilder', () => {
     await goToSummary()
 
     fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'c1' } })
-    fireEvent.click(screen.getByRole('button', { name: /Zatwierdź i Wyślij Plan/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Zatwierdź i wyślij plan/ }))
 
     await vi.waitFor(() => expect(callsOf('workout_plans', 'insert')).toHaveLength(1))
     expect(callsOf('workout_plans', 'insert')[0].args[0]).toEqual(
@@ -97,15 +98,14 @@ describe('WorkoutBuilder', () => {
     )
   })
 
-  it('trener bez wyboru odbiorcy dostaje alert i plan nie jest zapisany', async () => {
+  it('trener bez wyboru odbiorcy dostaje komunikat i plan nie jest zapisany', async () => {
     setResult('trainer_clients', { data: [{ client: { id: 'c1', nickname: 'kid' } }] })
     render(<WorkoutBuilder session={session} profile={{ role: 'trainer' }} />)
     await goToSummary()
 
-    fireEvent.click(screen.getByRole('button', { name: /Zatwierdź i Wyślij Plan/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Zatwierdź i wyślij plan/ }))
 
-    // BUG: produkcja nadal używa alert() zamiast toast.error (patrz BUGS.md, pkt 2)
-    expect(window.alert).toHaveBeenCalledWith('Wybierz odbiorcę planu z listy!')
+    expect(getToasts().some(t => t.type === 'error' && t.message === 'Wybierz odbiorcę planu z listy.')).toBe(true)
     expect(callsOf('workout_plans', 'insert')).toHaveLength(0)
   })
 })

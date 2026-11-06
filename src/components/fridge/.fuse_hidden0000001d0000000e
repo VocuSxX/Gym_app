@@ -1,0 +1,91 @@
+import { useState, useEffect } from 'react'
+import { toast } from '../../notify'
+import { addEntry } from '../../api/food'
+import { MEALS, macrosFor, type Food, type MealKey, type Macros } from '../../nutrition'
+import FoodSearch from './FoodSearch'
+import PortionForm from './PortionForm'
+import CustomFoodForm from './CustomFoodForm'
+import QuickAddForm from './QuickAddForm'
+import DishesTab from './DishesTab'
+
+type Tab = 'search' | 'dishes' | 'new' | 'quick'
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'search', label: '🔎 Szukaj' },
+  { key: 'dishes', label: '🍲 Moje dania' },
+  { key: 'new', label: '➕ Własny produkt' },
+  { key: 'quick', label: '⚡ Szybkie kalorie' },
+]
+
+// Okno dodawania do posiłku
+export default function AddFoodModal({ userId, meal, date, onClose, onAdded }: {
+  userId: string
+  meal: MealKey
+  date: string
+  onClose: () => void
+  onAdded: () => void
+}) {
+  const [tab, setTab] = useState<Tab>('search')
+  const [picked, setPicked] = useState<Food | null>(null)
+  const info = MEALS.find(m => m.key === meal)!
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const save = async (name: string, m: Macros, grams: number | null, foodId: string | null) => {
+    const ok = await addEntry(userId, { entry_date: date, meal_type: meal, name, grams, food_id: foodId, ...m })
+    if (!ok) return toast.error('Nie udało się dodać wpisu.')
+    toast.success(`Dodano do: ${info.label}`)
+    onAdded()
+    onClose()
+  }
+
+  const addFood = (food: Food, grams: number) =>
+    save(food.brand ? `${food.name} (${food.brand})` : food.name, macrosFor(food, grams), grams, food.id)
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in sm:items-center sm:p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Dodaj do: ${info.label}`}
+        className="flex max-h-[92vh] w-full max-w-lg flex-col gap-5 overflow-y-auto rounded-t-3xl border border-white/10 bg-zinc-900 p-6 shadow-2xl sm:rounded-3xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-extrabold text-white">{info.icon} Dodaj do: {info.label}</h3>
+          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-zinc-400 transition-colors hover:text-white" aria-label="Zamknij">✕</button>
+        </div>
+
+        {!picked && (
+          <div className="flex flex-wrap gap-2">
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={`rounded-full border px-4 py-2 text-sm font-bold transition-all duration-200 active:scale-95 ${tab === t.key ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400' : 'border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white'}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {picked ? (
+          <PortionForm food={picked} submitLabel="Dodaj do posiłku" onBack={() => setPicked(null)} onSubmit={g => addFood(picked, g)} />
+        ) : tab === 'search' ? (
+          <FoodSearch userId={userId} onPick={setPicked} />
+        ) : tab === 'dishes' ? (
+          <DishesTab userId={userId} onAdd={(name, m) => save(name, m, null, null)} />
+        ) : tab === 'new' ? (
+          <CustomFoodForm userId={userId} onCreated={setPicked} />
+        ) : (
+          <QuickAddForm onSubmit={(name, m) => save(name, m, null, null)} />
+        )}
+      </div>
+    </div>
+  )
+}

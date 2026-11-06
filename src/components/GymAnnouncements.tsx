@@ -44,7 +44,7 @@ export default function GymAnnouncements({ session }: { session: any }) {
       <form onSubmit={add} className={`${glassCard} flex flex-col gap-4`}>
         <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Tytuł (np. Święto – skrócone godziny)" className={inputBase} />
         <textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Treść ogłoszenia..." className={`${inputBase} h-24 resize-none`} />
-        <button type="submit" className={`${btnPrimarySm} w-fit`}>📢 Opublikuj</button>
+        <button type="submit" className={`${btnPrimarySm} w-fit`}>Opublikuj</button>
       </form>
 
       <div className="flex flex-col gap-4">
@@ -58,7 +58,7 @@ export default function GymAnnouncements({ session }: { session: any }) {
             <button onClick={() => remove(a.id)} className={btnDanger}>Usuń</button>
           </div>
         ))}
-        {items.length === 0 && <div className="rounded-3xl border border-dashed border-white/10 bg-black/20 p-8 text-center text-zinc-400">Brak ogłoszeń.</div>}
+        {items.length === 0 && <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950 p-8 text-center text-zinc-400">Brak ogłoszeń.</div>}
       </div>
     </div>
   )

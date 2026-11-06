@@ -1,0 +1,83 @@
+import { useState, useEffect } from 'react'
+import { glassCard } from '../ui'
+import { toast } from '../notify'
+import { toKey, todayStr, calcTarget, waterGoalMl } from '../health'
+import { listEntries, deleteEntry, type FoodEntry } from '../api/food'
+import { MEALS, sumMacros, macroTargets, type MealKey } from '../nutrition'
+import DaySummary from './fridge/DaySummary'
+import MacroSuggestions from './fridge/MacroSuggestions'
+import MealSection from './fridge/MealSection'
+import AddFoodModal from './fridge/AddFoodModal'
+import WaterTracker from './WaterTracker'
+
+const shiftDay = (key: string, days: number) => {
+  const [y, m, d] = key.split('-').map(Number)
+  return toKey(new Date(y, m - 1, d + days))
+}
+
+const dayLabel = (key: string) => {
+  const today = todayStr()
+  if (key === today) return 'Dziś'
+  if (key === shiftDay(today, -1)) return 'Wczoraj'
+  if (key === shiftDay(today, 1)) return 'Jutro'
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+// Lodówka: dziennik posiłków, makroskładniki, woda
+export default function Fridge({ session, profile }: { session: any; profile: any }) {
+  const [date, setDate] = useState(todayStr())
+  const [entries, setEntries] = useState<FoodEntry[]>([])
+  const [adding, setAdding] = useState<MealKey | null>(null)
+  const userId = session.user.id
+
+  const load = async () => setEntries(await listEntries(userId, date))
+  useEffect(() => { load() }, [date, session])
+
+  const remove = async (id: string) => {
+    if (!(await deleteEntry(id))) return toast.error('Nie udało się usunąć wpisu.')
+    load()
+  }
+
+  const total = sumMacros(entries)
+  const target = macroTargets(calcTarget(profile), profile?.weight_kg ? Number(profile.weight_kg) : null)
+  const isToday = date === todayStr()
+
+  return (
+    <div className="max-w-3xl w-full flex flex-col gap-6 animate-fade-in">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-4xl font-extrabold tracking-tight text-white">Lodówka</h1>
+        <p className="text-zinc-400">Dziennik posiłków, makroskładniki i woda w jednym miejscu.</p>
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <button type="button" onClick={() => setDate(shiftDay(date, -1))} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-lg text-zinc-300 transition-all duration-200 hover:bg-white/10 hover:text-white active:scale-95" aria-label="Poprzedni dzień">‹</button>
+        <div className="flex flex-col items-center">
+          <span className="text-lg font-extrabold capitalize text-white">{dayLabel(date)}</span>
+          {!isToday && <button type="button" onClick={() => setDate(todayStr())} className="text-xs font-bold text-emerald-400 hover:underline">Wróć do dziś</button>}
+        </div>
+        <button type="button" onClick={() => setDate(shiftDay(date, 1))} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-lg text-zinc-300 transition-all duration-200 hover:bg-white/10 hover:text-white active:scale-95" aria-label="Następny dzień">›</button>
+      </div>
+
+      <div className={glassCard}>
+        <DaySummary total={total} target={target} />
+      </div>
+
+      {isToday && target && (
+        <MacroSuggestions
+          userId={userId}
+          remaining={{ kcal: target.kcal - total.kcal, protein: target.protein - total.protein, carbs: target.carbs - total.carbs, fat: target.fat - total.fat }}
+          onAdded={load}
+        />
+      )}
+
+      {MEALS.map(meal => (
+        <MealSection key={meal.key} meal={meal} entries={entries.filter(e => e.meal_type === meal.key)} onAdd={() => setAdding(meal.key)} onDelete={remove} />
+      ))}
+
+      {isToday && <WaterTracker session={session} goalMl={waterGoalMl(profile)} />}
+
+      {adding && <AddFoodModal userId={userId} meal={adding} date={date} onClose={() => setAdding(null)} onAdded={load} />}
+    </div>
+  )
+}

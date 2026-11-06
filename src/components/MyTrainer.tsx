@@ -1,0 +1,110 @@
+import { useState, useEffect } from 'react'
+import { supabase } from '../supabaseClient'
+import { toast } from '../notify'
+import { glassCard, btnPrimarySm, inputBase } from '../ui'
+import Icon from './Icon'
+
+type Pkg = { id: string; trainer_id: string; title: string; sessions_total: number; sessions_used: number; paid: boolean }
+type Review = { rating: number; comment: string }
+
+// Widok ćwiczącego: moi trenerzy, pakiety sesji i ocena trenera
+export default function MyTrainer({ session, onFind }: { session: any; onFind: () => void }) {
+  const me = session.user.id
+  const [trainers, setTrainers] = useState<any[]>([])
+  const [pkgs, setPkgs] = useState<Pkg[]>([])
+  const [reviews, setReviews] = useState<Record<string, Review>>({})
+  const [drafts, setDrafts] = useState<Record<string, Review>>({})
+  const [loading, setLoading] = useState(true)
+
+  const load = async () => {
+    const [{ data: rel }, { data: pk }, { data: rv }] = await Promise.all([
+      supabase.from('trainer_clients').select('trainer:profiles!trainer_id(id, nickname, bio, specializations, price_info, city)').eq('client_id', me).eq('status', 'active'),
+      supabase.from('session_packages').select('id, trainer_id, title, sessions_total, sessions_used, paid').eq('client_id', me).order('created_at', { ascending: false }),
+      supabase.from('trainer_reviews').select('trainer_id, rating, comment').eq('client_id', me),
+    ])
+    setTrainers(((rel || []) as any[]).map(r => r.trainer).filter(Boolean))
+    setPkgs((pk || []) as Pkg[])
+    const map: Record<string, Review> = {}
+    ;((rv || []) as any[]).forEach(r => { map[r.trainer_id] = { rating: r.rating, comment: r.comment || '' } })
+    setReviews(map)
+    setDrafts(map)
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [session])
+
+  const saveReview = async (trainerId: string) => {
+    const d = drafts[trainerId]
+    if (!d || !d.rating) return toast.error('Wybierz ocenę (1-5 gwiazdek).')
+    const { error } = await supabase.from('trainer_reviews').upsert(
+      { trainer_id: trainerId, client_id: me, rating: d.rating, comment: d.comment.trim() },
+      { onConflict: 'trainer_id,client_id' },
+    )
+    if (error) return toast.error('Nie udało się zapisać opinii.')
+    toast.success('Dziękujemy za opinię!')
+    load()
+  }
+
+  if (loading) return <p className="text-zinc-400 font-bold animate-pulse">Ładowanie...</p>
+
+  if (trainers.length === 0) {
+    return (
+      <div className={`${glassCard} max-w-xl text-center py-14 flex flex-col items-center gap-4 border-dashed`}>
+        <Icon name="graduation" size={40} className="text-zinc-600" />
+        <h2 className="text-2xl font-extrabold text-white">Nie masz jeszcze trenera</h2>
+        <p className="text-zinc-400">Znajdź trenera i wyślij mu zaproszenie.</p>
+        <button type="button" onClick={onFind} className={btnPrimarySm}><Icon name="search" size={16} />Znajdź trenera</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-3xl w-full flex flex-col gap-8 animate-fade-in">
+
+      {trainers.map(t => {
+        const mine = pkgs.filter(p => p.trainer_id === t.id)
+        const d = drafts[t.id] || { rating: 0, comment: '' }
+        return (
+          <div key={t.id} className={`${glassCard} flex flex-col gap-5`}>
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-500/15 text-accent-400"><Icon name="graduation" size={26} /></div>
+              <div>
+                <h3 className="text-xl font-bold text-white">@{t.nickname}</h3>
+                <p className="text-sm text-zinc-400">{[t.city, t.price_info].filter(Boolean).join(' · ') || 'Trener'}</p>
+              </div>
+            </div>
+            {t.bio && <p className="text-sm text-zinc-400">{t.bio}</p>}
+
+            <div className="flex flex-col gap-3">
+              <p className="text-xs font-bold text-zinc-400">Pakiety sesji</p>
+              {mine.map(p => (
+                <div key={p.id} className="flex flex-col gap-2 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-white">{p.title}</span>
+                    <span className="text-sm font-bold text-accent-400">{p.sessions_total - p.sessions_used} z {p.sessions_total} zostało</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+                    <div className="h-full rounded-full bg-accent-500" style={{ width: `${Math.round((p.sessions_used / p.sessions_total) * 100)}%` }} />
+                  </div>
+                  <span className={`text-xs font-bold ${p.paid ? 'text-accent-400' : 'text-amber-400'}`}>{p.paid ? 'Opłacony' : 'Nieopłacony'}</span>
+                </div>
+              ))}
+              {mine.length === 0 && <p className="text-sm text-zinc-400">Trener nie dodał jeszcze pakietu sesji.</p>}
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <p className="text-xs font-bold text-zinc-400">{reviews[t.id] ? 'Twoja opinia' : 'Oceń trenera'}</p>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button key={n} type="button" aria-label={`${n} gwiazdek`} onClick={() => setDrafts({ ...drafts, [t.id]: { ...d, rating: n } })} className={`text-3xl transition-transform active:scale-90 ${n <= d.rating ? 'text-accent-400' : 'text-zinc-600'}`}>★</button>
+                ))}
+              </div>
+              <textarea value={d.comment} onChange={e => setDrafts({ ...drafts, [t.id]: { ...d, comment: e.target.value } })} placeholder="Komentarz (opcjonalnie)" className={`${inputBase} h-20 resize-none`} />
+              <button type="button" onClick={() => saveReview(t.id)} className={`${btnPrimarySm} w-fit`}>{reviews[t.id] ? 'Zaktualizuj opinię' : 'Wyślij opinię'}</button>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}

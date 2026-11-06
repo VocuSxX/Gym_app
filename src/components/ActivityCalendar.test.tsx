@@ -11,8 +11,8 @@ vi.mock('../supabaseClient', async () => {
 const session = { user: { id: 'u1' } }
 const profile = { gym_id: null }
 
-const summaryText = (container: HTMLElement) =>
-  container.querySelector('p.text-sm.font-bold')?.textContent ?? ''
+const activeDays = (container: HTMLElement) =>
+  Array.from(container.querySelectorAll('[title]')).filter(el => !(el.getAttribute('title') || '').endsWith(': 0')).length
 
 describe('ActivityCalendar', () => {
   beforeEach(() => {
@@ -25,7 +25,7 @@ describe('ActivityCalendar', () => {
     vi.useRealTimers()
   })
 
-  it('liczy aktywne dni i serię z dzisiejszych oraz wczorajszych logów', async () => {
+  it('liczy aktywne dni z dzisiejszych oraz wczorajszych logów', async () => {
     setResult('exercise_logs', {
       data: [
         { logged_at: '2026-10-25T09:00:00' },
@@ -37,11 +37,10 @@ describe('ActivityCalendar', () => {
     setResult('gym_checkins', { data: [] })
     const { container } = render(<ActivityCalendar session={session} profile={profile} />)
 
-    await vi.waitFor(() => expect(summaryText(container)).toContain('2 🔥'))
-    expect(summaryText(container)).toContain('Aktywne dni: 2')
+    await vi.waitFor(() => expect(activeDays(container)).toBe(2))
   })
 
-  it('seria działa od wczoraj, gdy dziś nie ma aktywności', async () => {
+  it('liczy dni, gdy dziś nie ma aktywności', async () => {
     setResult('exercise_logs', {
       data: [
         { logged_at: '2026-10-24T09:00:00' },
@@ -51,15 +50,15 @@ describe('ActivityCalendar', () => {
     setResult('gym_checkins', { data: [] })
     const { container } = render(<ActivityCalendar session={session} profile={profile} />)
 
-    await vi.waitFor(() => expect(summaryText(container)).toContain('2 🔥'))
+    await vi.waitFor(() => expect(activeDays(container)).toBe(2))
   })
 
-  it('bez danych seria wynosi 0', async () => {
+  it('bez danych aktywnych dni jest 0', async () => {
     setResult('exercise_logs', { data: [] })
     setResult('gym_checkins', { data: [] })
     const { container } = render(<ActivityCalendar session={session} profile={profile} />)
 
-    await vi.waitFor(() => expect(summaryText(container)).toContain('0 🔥'))
+    await vi.waitFor(() => expect(activeDays(container)).toBe(0))
   })
 
   it('dzisiejsze zameldowanie blokuje przycisk', async () => {

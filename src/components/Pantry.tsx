@@ -1,0 +1,180 @@
+import { useState, useEffect } from 'react'
+import { supabase } from '../supabaseClient'
+import { toast } from '../notify'
+import { glassCard, btnPrimarySm, btnGhost, inputBase } from '../ui'
+import { listRecipes, type RecipeRow } from '../api/food'
+import Icon from './Icon'
+
+type PantryItem = { id: string; name: string; quantity: number; unit: string }
+type ShopItem = { id: string; name: string; quantity: string; is_bought: boolean }
+
+const UNITS = ['szt', 'g', 'kg', 'ml', 'l', 'opak.']
+
+// Spiżarnia i lista zakupów
+export default function Pantry({ session }: { session: any }) {
+  const me = session.user.id
+  const [pantry, setPantry] = useState<PantryItem[]>([])
+  const [shop, setShop] = useState<ShopItem[]>([])
+  const [recipes, setRecipes] = useState<RecipeRow[]>([])
+
+  const [pName, setPName] = useState('')
+  const [pQty, setPQty] = useState('1')
+  const [pUnit, setPUnit] = useState('szt')
+  const [sName, setSName] = useState('')
+  const [sQty, setSQty] = useState('')
+  const [recipeId, setRecipeId] = useState('')
+
+  const load = async () => {
+    const [{ data: p }, { data: s }] = await Promise.all([
+      supabase.from('pantry_items').select('id, name, quantity, unit').eq('user_id', me).order('name'),
+      supabase.from('shopping_items').select('id, name, quantity, is_bought').eq('user_id', me).order('created_at', { ascending: true }),
+    ])
+    setPantry(((p || []) as any[]).map(i => ({ ...i, quantity: Number(i.quantity) })))
+    setShop((s || []) as ShopItem[])
+  }
+
+  useEffect(() => {
+    load()
+    listRecipes(me).then(setRecipes)
+  }, [session])
+
+  const addPantry = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const q = Number(pQty)
+    if (!pName.trim() || !Number.isFinite(q) || q < 0) return
+    const { error } = await supabase.from('pantry_items').insert({ user_id: me, name: pName.trim(), quantity: q, unit: pUnit })
+    if (error) return toast.error('Nie udało się dodać produktu.')
+    setPName('')
+    setPQty('1')
+    load()
+  }
+
+  const changeQty = async (item: PantryItem, delta: number) => {
+    const next = Math.max(0, Math.round((item.quantity + delta) * 100) / 100)
+    await supabase.from('pantry_items').update({ quantity: next }).eq('id', item.id)
+    load()
+  }
+
+  const removePantry = async (id: string) => {
+    await supabase.from('pantry_items').delete().eq('id', id)
+    load()
+  }
+
+  const addShop = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!sName.trim()) return
+    const { error } = await supabase.from('shopping_items').insert({ user_id: me, name: sName.trim(), quantity: sQty.trim() })
+    if (error) return toast.error('Nie udało się dodać do listy.')
+    setSName('')
+    setSQty('')
+    load()
+  }
+
+  const toggleBought = async (item: ShopItem) => {
+    await supabase.from('shopping_items').update({ is_bought: !item.is_bought }).eq('id', item.id)
+    load()
+  }
+
+  const removeShop = async (id: string) => {
+    await supabase.from('shopping_items').delete().eq('id', id)
+    load()
+  }
+
+  // Kupione trafiają do spiżarni (ilość: 1 szt, bo lista zakupów trzyma ilość jako tekst)
+  const moveBought = async () => {
+    const bought = shop.filter(i => i.is_bought)
+    if (bought.length === 0) return
+    const { error } = await supabase.from('pantry_items').insert(bought.map(i => ({ user_id: me, name: i.name, quantity: 1, unit: 'szt' })))
+    if (error) return toast.error('Nie udało się przenieść do spiżarni.')
+    await supabase.from('shopping_items').delete().in('id', bought.map(i => i.id))
+    toast.success(`Przeniesiono do spiżarni: ${bought.length}. Popraw ilości, jeśli trzeba.`)
+    load()
+  }
+
+  // Brakujące składniki dania (nie ma ich w spiżarni ani na liście) trafiają na listę zakupów
+  const addMissing = async () => {
+    const recipe = recipes.find(r => r.id === recipeId)
+    if (!recipe) return
+    const have = new Set([...pantry.filter(p => p.quantity > 0).map(p => p.name.toLowerCase()), ...shop.filter(s => !s.is_bought).map(s => s.name.toLowerCase())])
+    const missing = recipe.recipe_items.filter(i => i.food && !have.has(i.food.name.toLowerCase()))
+    if (missing.length === 0) return toast.info('Masz już wszystkie składniki w spiżarni lub na liście.')
+    const { error } = await supabase.from('shopping_items').insert(missing.map(i => ({ user_id: me, name: i.food!.name, quantity: `${i.grams} g` })))
+    if (error) return toast.error('Nie udało się dodać składników.')
+    toast.success(`Dodano do zakupów: ${missing.length}.`)
+    load()
+  }
+
+  const bought = shop.filter(i => i.is_bought).length
+
+  return (
+    <div className="max-w-4xl w-full flex flex-col gap-8 animate-fade-in">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-4xl font-extrabold tracking-tight text-white">Spiżarnia i zakupy</h1>
+        <p className="text-zinc-400">Zapisuj, co masz w domu, i planuj zakupy pod swoje dania.</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* SPIŻARNIA */}
+        <div className={`${glassCard} flex flex-col gap-4`}>
+          <h2 className="text-xl font-bold text-white">Spiżarnia ({pantry.length})</h2>
+          <form onSubmit={addPantry} className="grid grid-cols-6 gap-2">
+            <input type="text" value={pName} onChange={e => setPName(e.target.value)} placeholder="Produkt" className={`${inputBase} col-span-6`} />
+            <input type="number" min={0} step="any" value={pQty} onChange={e => setPQty(e.target.value)} className={`${inputBase} col-span-2`} />
+            <select value={pUnit} onChange={e => setPUnit(e.target.value)} className={`${inputBase} col-span-2`}>{UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select>
+            <button type="submit" disabled={!pName.trim()} className={`${btnPrimarySm} col-span-2 disabled:opacity-50 disabled:pointer-events-none`}>Dodaj</button>
+          </form>
+          <div className="flex max-h-96 flex-col gap-2 overflow-y-auto">
+            {pantry.map(i => (
+              <div key={i.id} className="flex items-center justify-between gap-2 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-2">
+                <span className={`min-w-0 truncate ${i.quantity === 0 ? 'text-zinc-500 line-through' : 'text-white'}`}>{i.name}</span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button type="button" onClick={() => changeQty(i, i.unit === 'g' || i.unit === 'ml' ? -100 : -1)} className="h-8 w-8 rounded-xl bg-zinc-800 font-bold text-zinc-300 hover:bg-zinc-700" aria-label={`Zmniejsz ${i.name}`}><Icon name="minus" size={14} /></button>
+                  <span className="min-w-[4.5rem] text-center text-sm font-bold text-accent-400">{i.quantity} {i.unit}</span>
+                  <button type="button" onClick={() => changeQty(i, i.unit === 'g' || i.unit === 'ml' ? 100 : 1)} className="h-8 w-8 rounded-xl bg-zinc-800 font-bold text-zinc-300 hover:bg-zinc-700" aria-label={`Zwiększ ${i.name}`}><Icon name="plus" size={14} /></button>
+                  <button type="button" onClick={() => removePantry(i.id)} className="px-1 text-zinc-400 hover:text-red-400" aria-label={`Usuń ${i.name}`}><Icon name="x" size={14} /></button>
+                </div>
+              </div>
+            ))}
+            {pantry.length === 0 && <p className="py-4 text-center text-sm text-zinc-400">Spiżarnia jest pusta.</p>}
+          </div>
+        </div>
+
+        {/* ZAKUPY */}
+        <div className={`${glassCard} flex flex-col gap-4`}>
+          <h2 className="text-xl font-bold text-white">Lista zakupów ({shop.length})</h2>
+          <form onSubmit={addShop} className="grid grid-cols-6 gap-2">
+            <input type="text" value={sName} onChange={e => setSName(e.target.value)} placeholder="Produkt" className={`${inputBase} col-span-6`} />
+            <input type="text" value={sQty} onChange={e => setSQty(e.target.value)} placeholder="Ilość (opcjonalnie)" className={`${inputBase} col-span-4`} />
+            <button type="submit" disabled={!sName.trim()} className={`${btnPrimarySm} col-span-2 disabled:opacity-50 disabled:pointer-events-none`}>Dodaj</button>
+          </form>
+          <div className="flex max-h-72 flex-col gap-2 overflow-y-auto">
+            {shop.map(i => (
+              <div key={i.id} className="flex items-center justify-between gap-2 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-2">
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                  <input type="checkbox" checked={i.is_bought} onChange={() => toggleBought(i)} className="h-5 w-5 shrink-0 accent-accent-500" />
+                  <span className={`truncate ${i.is_bought ? 'text-zinc-500 line-through' : 'text-white'}`}>{i.name}{i.quantity ? <span className="text-sm text-zinc-400"> · {i.quantity}</span> : null}</span>
+                </label>
+                <button type="button" onClick={() => removeShop(i.id)} className="px-1 text-zinc-400 hover:text-red-400" aria-label={`Usuń ${i.name}`}><Icon name="x" size={14} /></button>
+              </div>
+            ))}
+            {shop.length === 0 && <p className="py-4 text-center text-sm text-zinc-400">Lista jest pusta.</p>}
+          </div>
+          {bought > 0 && <button type="button" onClick={moveBought} className={btnGhost}>Przenieś kupione do spiżarni ({bought})</button>}
+
+          {recipes.length > 0 && (
+            <div className="flex flex-col gap-2 border-t border-zinc-800 pt-4">
+              <p className="text-xs font-bold text-zinc-400">Z moich dań</p>
+              <div className="flex gap-2">
+                <select value={recipeId} onChange={e => setRecipeId(e.target.value)} className={inputBase}>
+                  <option value="">Wybierz danie...</option>
+                  {recipes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+                <button type="button" onClick={addMissing} disabled={!recipeId} className={`${btnPrimarySm} shrink-0 disabled:opacity-50 disabled:pointer-events-none`}>Dodaj brakujące</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

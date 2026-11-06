@@ -7,6 +7,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  optimizeDeps: {
+    exclude: ['maplibre-gl'],
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],

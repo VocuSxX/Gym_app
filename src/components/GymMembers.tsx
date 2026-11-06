@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import { confirmDialog, toast } from '../notify'
 import { glassCard, btnDanger } from '../ui'
 import { useMyGym } from '../useMyGym'
 import { toKey } from '../health'
@@ -27,8 +28,9 @@ export default function GymMembers({ session }: { session: any }) {
   useEffect(() => { fetchData() }, [gym])
 
   const remove = async (id: string) => {
-    if (!window.confirm('Usunąć tego członka z siłowni?')) return
+    if (!(await confirmDialog('Usunąć tego członka z siłowni?', { confirmLabel: 'Usuń' }))) return
     await supabase.from('gym_members').delete().eq('id', id)
+    toast.success('Członek usunięty z siłowni.')
     fetchData()
   }
 
@@ -52,12 +54,12 @@ export default function GymMembers({ session }: { session: any }) {
               <span className="text-sm text-zinc-400">{[m.user?.first_name, m.user?.last_name].filter(Boolean).join(' ')}</span>
             </div>
             <div className="flex items-center gap-4">
-              <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-sm font-bold text-emerald-400">{visits[m.user?.id] || 0} wejść / 30 dni</span>
+              <span className="rounded-full bg-accent-500/15 px-3 py-1 text-sm font-bold text-accent-400">{visits[m.user?.id] || 0} wejść / 30 dni</span>
               <button onClick={() => remove(m.id)} className={btnDanger}>Usuń</button>
             </div>
           </div>
         ))}
-        {members.length === 0 && <div className="rounded-3xl border border-dashed border-white/10 bg-black/20 p-8 text-center text-zinc-400">Nikt jeszcze nie zapisał się do Twojej siłowni.</div>}
+        {members.length === 0 && <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950 p-8 text-center text-zinc-400">Nikt jeszcze nie zapisał się do Twojej siłowni.</div>}
       </div>
     </div>
   )

@@ -4,7 +4,7 @@ import { glassCard, btnPrimarySm } from '../ui'
 import { toKey, todayStr } from '../health'
 
 const WEEKS = 26
-const LEVELS = ['bg-white/5', 'bg-emerald-500/30', 'bg-emerald-500/55', 'bg-emerald-500/80', 'bg-emerald-400']
+const LEVELS = ['bg-zinc-800', 'bg-accent-500/70', 'bg-accent-500/85', 'bg-accent-500', 'bg-accent-400']
 
 const levelFor = (n: number) => (n === 0 ? 0 : n <= 5 ? 1 : n <= 12 ? 2 : n <= 20 ? 3 : 4)
 
@@ -45,26 +45,17 @@ export default function ActivityCalendar({ session, profile, onChange }: { sessi
     onChange?.()
   }
 
-  // Seria dni z rzędu (liczymy od dziś, a gdy dziś pusto - od wczoraj)
-  let streak = 0
-  const cursor = new Date(today)
-  if (!counts[toKey(cursor)]) cursor.setDate(cursor.getDate() - 1)
-  while (counts[toKey(cursor)]) { streak++; cursor.setDate(cursor.getDate() - 1) }
-
-  const activeDays = Object.values(counts).filter(n => n > 0).length
-
   const cells = Array.from({ length: WEEKS * 7 }, (_, i) => {
     const d = new Date(start)
     d.setDate(start.getDate() + i)
-    return { key: toKey(d), future: d > today }
+    return { key: toKey(d), future: d > today, isToday: d.getTime() === today.getTime() }
   })
 
   return (
     <div className={`${glassCard} flex flex-col gap-5`}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-xl font-bold text-white">📅 Kalendarz aktywności</h3>
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <button onClick={checkIn} disabled={checkedIn} className={`${btnPrimarySm} disabled:opacity-50 disabled:pointer-events-none`}>
-          {checkedIn ? '✓ Jesteś dziś na siłowni' : '📍 Jestem na siłowni'}
+          {checkedIn ? 'Jesteś dziś na siłowni' : 'Jestem na siłowni'}
         </button>
       </div>
 
@@ -76,15 +67,11 @@ export default function ActivityCalendar({ session, profile, onChange }: { sessi
             <div
               key={c.key}
               title={`${c.key}: ${counts[c.key] || 0}`}
-              className={`h-3.5 w-3.5 rounded-[4px] ${c.future ? 'opacity-0' : LEVELS[levelFor(counts[c.key] || 0)]}`}
+              className={`h-3.5 w-3.5 rounded-[4px] ${c.future ? 'opacity-0' : LEVELS[levelFor(counts[c.key] || 0)]} ${c.isToday ? 'ring-1 ring-zinc-300' : ''}`}
             />
           ))}
         </div>
       </div>
-
-      <p className="text-sm font-bold text-zinc-400">
-        Aktywne dni: <span className="text-white">{activeDays}</span> · Seria: <span className="text-emerald-400">{streak} 🔥</span>
-      </p>
     </div>
   )
 }

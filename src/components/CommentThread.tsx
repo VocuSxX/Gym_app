@@ -42,13 +42,13 @@ export default function CommentThread({ session, clientId, sessionDate, workoutE
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-white/5 bg-black/20 p-4">
+    <div className="flex flex-col gap-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
       {comments.map(c => {
         const isMe = c.author_id === session.user.id
         return (
           <div key={c.id} className={`flex flex-col gap-1 ${isMe ? 'items-end' : 'items-start'}`}>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">@{c.author?.nickname || '?'}</span>
-            <div className={`max-w-[85%] rounded-2xl px-4 py-2 ${isMe ? 'bg-emerald-500 text-white' : 'border border-white/10 bg-white/10 text-white'}`}>
+            <span className="text-xs font-bold text-zinc-400">@{c.author?.nickname || '?'}</span>
+            <div className={`max-w-[85%] rounded-2xl px-4 py-2 ${isMe ? 'bg-accent-500 text-white' : 'border border-zinc-800 bg-zinc-800 text-white'}`}>
               {c.content}
             </div>
           </div>

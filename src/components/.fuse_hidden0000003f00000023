@@ -1,0 +1,115 @@
+import { useState, useEffect } from 'react'
+import { supabase } from '../supabaseClient'
+import { confirmDialog, toast } from '../notify'
+import { glassCard, btnPrimarySm, btnGhost, btnDanger } from '../ui'
+import { createPlanFromTemplate, type TemplateData } from '../api/plans'
+
+type Template = { id: string; name: string; data: TemplateData }
+
+// Biblioteka szablonów planów: zapisujesz raz (w kreatorze), przypisujesz wielu osobom
+export default function PlanTemplates({ session, profile }: { session: any; profile: any }) {
+  const isTrainer = profile?.role === 'trainer'
+  const me = session.user.id
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [clients, setClients] = useState<{ id: string; nickname: string }[]>([])
+  const [assigning, setAssigning] = useState<Template | null>(null)
+  const [selected, setSelected] = useState<string[]>([])
+  const [busy, setBusy] = useState(false)
+
+  const load = async () => {
+    const { data } = await supabase.from('plan_templates').select('id, name, data').eq('owner_id', me).order('created_at', { ascending: false })
+    setTemplates((data || []) as Template[])
+  }
+
+  useEffect(() => {
+    load()
+    if (isTrainer) {
+      supabase.from('trainer_clients').select('client:profiles!client_id(id, nickname)').eq('trainer_id', me).eq('status', 'active')
+        .then(({ data }) => setClients(((data || []) as any[]).map(r => r.client).filter(Boolean)))
+    }
+  }, [session])
+
+  const remove = async (t: Template) => {
+    if (!(await confirmDialog(`Usunąć szablon „${t.name}”?`, { confirmLabel: 'Usuń' }))) return
+    const { error } = await supabase.from('plan_templates').delete().eq('id', t.id)
+    if (error) return toast.error('Nie udało się usunąć szablonu.')
+    toast.success('Szablon usunięty.')
+    load()
+  }
+
+  const toggle = (id: string) => setSelected(s => (s.includes(id) ? s.filter(x => x !== id) : [...s, id]))
+
+  const assign = async () => {
+    if (!assigning || selected.length === 0) return
+    setBusy(true)
+    let ok = 0
+    for (const target of selected) {
+      const isSelf = target === 'self'
+      const done = await createPlanFromTemplate({
+        name: assigning.name,
+        days: assigning.data.days,
+        clientId: isSelf ? me : target,
+        trainerId: isSelf && !isTrainer ? null : me,
+        isSelf,
+      })
+      if (done) ok++
+    }
+    setBusy(false)
+    if (ok === selected.length) toast.success(ok === 1 ? 'Plan przypisany.' : `Plan przypisany ${ok} osobom.`)
+    else toast.error(`Przypisano ${ok} z ${selected.length}. Spróbuj ponownie dla pozostałych.`)
+    setAssigning(null)
+    setSelected([])
+  }
+
+  const countEx = (t: Template) => t.data.days.reduce((s, d) => s + d.exercises.length, 0)
+
+  return (
+    <div className="max-w-3xl w-full flex flex-col gap-8 animate-fade-in">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-4xl font-extrabold tracking-tight text-white">Szablony planów</h1>
+        <p className="text-zinc-400">Zapisz plan w kreatorze („Zapisz jako szablon" w ostatnim kroku), a potem przypisuj go jednym kliknięciem.</p>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {templates.map(t => (
+          <div key={t.id} className={`${glassCard} flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between`}>
+            <div>
+              <h3 className="text-xl font-bold text-white">{t.name}</h3>
+              <p className="text-sm text-zinc-400">{t.data.days.length} dni · {countEx(t)} ćwiczeń · {t.data.days.map(d => d.name).join(', ')}</p>
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => { setAssigning(t); setSelected([]) }} className={btnPrimarySm}>Przypisz</button>
+              <button type="button" onClick={() => remove(t)} className={`${btnDanger} !px-4`} aria-label="Usuń szablon">🗑</button>
+            </div>
+          </div>
+        ))}
+        {templates.length === 0 && (
+          <div className="rounded-3xl border border-dashed border-white/10 bg-black/20 p-10 text-center text-zinc-400">Nie masz jeszcze szablonów. Stwórz plan w kreatorze i zapisz go jako szablon.</div>
+        )}
+      </div>
+
+      {assigning && (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in sm:items-center sm:p-4" onClick={() => !busy && setAssigning(null)}>
+          <div role="dialog" aria-modal="true" className="flex max-h-[90vh] w-full max-w-md flex-col gap-5 overflow-y-auto rounded-t-3xl border border-white/10 bg-zinc-900 p-6 shadow-2xl sm:rounded-3xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-xl font-extrabold text-white">Przypisz „{assigning.name}”</h3>
+            <p className="text-sm text-zinc-400">Zaznacz odbiorców. Ich dotychczasowy aktywny plan zostanie zarchiwizowany.</p>
+            <div className="flex flex-col gap-2">
+              {[{ id: 'self', nickname: 'Dla siebie' }, ...(isTrainer ? clients : [])].map(c => (
+                <label key={c.id} className="flex cursor-pointer items-center gap-3 rounded-2xl border border-white/5 bg-black/30 px-4 py-3">
+                  <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggle(c.id)} className="h-5 w-5 accent-emerald-500" />
+                  <span className="font-bold text-white">{c.id === 'self' ? '🙋 Dla siebie' : `@${c.nickname}`}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setAssigning(null)} disabled={busy} className={`${btnGhost} flex-1`}>Anuluj</button>
+              <button type="button" onClick={assign} disabled={busy || selected.length === 0} className={`${btnPrimarySm} flex-1 disabled:opacity-50 disabled:pointer-events-none`}>
+                {busy ? 'Przypisywanie...' : `Przypisz (${selected.length})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

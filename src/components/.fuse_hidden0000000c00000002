@@ -1,0 +1,92 @@
+import { useState, useEffect } from 'react'
+import { glassCard } from '../ui'
+import {
+  BADGES, fetchTrainingDays, fetchRecords, fetchOwnedBadges, evaluateBadges, announceBadges, streakFrom,
+  type RecordRow,
+} from '../achievements'
+
+export default function Achievements({ session }: { session: any }) {
+  const [loading, setLoading] = useState(true)
+  const [streak, setStreak] = useState({ current: 0, best: 0 })
+  const [totalDays, setTotalDays] = useState(0)
+  const [records, setRecords] = useState<RecordRow[]>([])
+  const [owned, setOwned] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const load = async () => {
+      // Najpierw przyznajemy zaległe odznaki, potem czytamy aktualny stan
+      announceBadges(await evaluateBadges(session.user.id))
+      const [days, recs, badges] = await Promise.all([fetchTrainingDays(), fetchRecords(), fetchOwnedBadges(session.user.id)])
+      setStreak(streakFrom(days))
+      setTotalDays(days.length)
+      setRecords(recs)
+      setOwned(badges)
+      setLoading(false)
+    }
+    load()
+  }, [session])
+
+  if (loading) return <p className="text-zinc-400 font-bold animate-pulse">Ładowanie osiągnięć...</p>
+
+  const stats = [
+    { icon: '🔥', label: 'Seria teraz', value: `${streak.current} dni`, color: 'text-orange-400' },
+    { icon: '👑', label: 'Najdłuższa seria', value: `${streak.best} dni`, color: 'text-amber-400' },
+    { icon: '📅', label: 'Dni treningowe', value: String(totalDays), color: 'text-emerald-400' },
+    { icon: '🏅', label: 'Odznaki', value: `${Object.keys(owned).length} / ${BADGES.length}`, color: 'text-violet-400' },
+  ]
+
+  return (
+    <div className="max-w-4xl w-full flex flex-col gap-8 animate-fade-in">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-4xl font-extrabold tracking-tight text-white">Osiągnięcia</h1>
+        <p className="text-zinc-400">Seria, rekordy i odznaki. Trenuj regularnie, a lista będzie rosła.</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {stats.map(s => (
+          <div key={s.label} className={`${glassCard} flex flex-col gap-1 !p-5`}>
+            <span className="text-sm font-bold text-zinc-400">{s.icon} {s.label}</span>
+            <span className={`text-2xl font-extrabold ${s.color}`}>{s.value}</span>
+          </div>
+        ))}
+      </div>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-emerald-400">Odznaki</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {BADGES.map(b => {
+            const got = owned[b.key]
+            return (
+              <div key={b.key} className={`flex items-center gap-4 rounded-3xl border p-5 transition-all duration-200 ${got ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-white/5 bg-black/20 opacity-60'}`}>
+                <span className={`text-4xl ${got ? '' : 'grayscale'}`}>{b.icon}</span>
+                <div className="min-w-0">
+                  <p className="font-bold text-white">{b.title}</p>
+                  <p className="text-xs text-zinc-400">{got ? `Zdobyta ${new Date(got).toLocaleDateString('pl-PL')}` : b.desc}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-amber-400">Twoje rekordy ({records.length})</h2>
+        {records.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-white/10 bg-black/20 p-8 text-center text-zinc-400">Rekordy pojawią się po pierwszych zapisanych seriach z ciężarem.</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {records.map(r => (
+              <div key={r.exercise_name} className="flex items-center justify-between gap-3 rounded-2xl border border-white/5 bg-black/30 px-5 py-3">
+                <div className="min-w-0">
+                  <p className="truncate font-bold text-white">{r.exercise_name}</p>
+                  <p className="text-xs text-zinc-400">{new Date(r.best_at).toLocaleDateString('pl-PL')}</p>
+                </div>
+                <span className="shrink-0 text-xl font-extrabold text-amber-400">{r.best_weight} kg</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  )
+}

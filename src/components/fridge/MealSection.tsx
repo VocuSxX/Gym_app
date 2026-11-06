@@ -1,0 +1,44 @@
+import { glassCard, btnGhost } from '../../ui'
+import { sumMacros, type MealKey } from '../../nutrition'
+import type { FoodEntry } from '../../api/food'
+import Icon from '../Icon'
+
+export default function MealSection({ meal, entries, onAdd, onDelete }: {
+  meal: { key: MealKey; label: string; icon: string }
+  entries: FoodEntry[]
+  onAdd: () => void
+  onDelete: (id: string) => void
+}) {
+  const total = sumMacros(entries)
+  return (
+    <div className={`${glassCard} flex flex-col gap-4`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-800 text-accent-400"><Icon name={meal.icon} size={20} /></span>
+          <div>
+            <h3 className="text-lg font-bold text-white">{meal.label}</h3>
+            <p className="text-xs font-bold text-zinc-400">{total.kcal} kcal · B {total.protein} · W {total.carbs} · T {total.fat}</p>
+          </div>
+        </div>
+        <button type="button" onClick={onAdd} className={`${btnGhost} !py-2`}><Icon name="plus" size={16} />Dodaj</button>
+      </div>
+
+      {entries.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {entries.map(en => (
+            <div key={en.id} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-2">
+              <div className="min-w-0">
+                <p className="truncate text-white">{en.name}</p>
+                {en.grams ? <p className="text-xs text-zinc-400">{en.grams} g</p> : null}
+              </div>
+              <div className="flex shrink-0 items-center gap-3">
+                <span className="font-bold text-accent-400">{Math.round(en.kcal)} kcal</span>
+                <button type="button" onClick={() => onDelete(en.id)} className="text-zinc-400 transition-colors hover:text-red-400" aria-label={`Usuń ${en.name}`}><Icon name="x" size={16} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

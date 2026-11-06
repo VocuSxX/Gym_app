@@ -22,9 +22,9 @@ export default function GymFeed() {
 
   return (
     <div className={`${glassCard} flex flex-col gap-3 border-amber-500/20`}>
-      <h3 className="text-sm font-bold uppercase tracking-widest text-amber-400">📢 Ogłoszenia siłowni</h3>
+      <h3 className="text-sm font-bold text-amber-400">Ogłoszenia siłowni</h3>
       {items.map(a => (
-        <div key={a.id} className="flex flex-col gap-1 rounded-2xl border border-white/5 bg-black/30 p-4">
+        <div key={a.id} className="flex flex-col gap-1 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
           <p className="font-bold text-white">{a.title} <span className="text-xs font-normal text-zinc-400">· {a.gym?.name}</span></p>
           {a.content && <p className="text-sm text-zinc-400">{a.content}</p>}
         </div>

@@ -1,0 +1,84 @@
+import { useState, useEffect } from 'react'
+import { supabase } from '../supabaseClient'
+import { confirmDialog, toast } from '../notify'
+import { btnPrimarySm, btnGhost, btnDanger, inputBase } from '../ui'
+import Icon from './Icon'
+
+type Pkg = { id: string; title: string; sessions_total: number; sessions_used: number; price: number; paid: boolean }
+
+// Pakiety sesji podopiecznego (widok trenera). Płatności rozlicza trener ręcznie.
+export default function ClientPackages({ trainerId, clientId }: { trainerId: string; clientId: string }) {
+  const [pkgs, setPkgs] = useState<Pkg[]>([])
+  const [title, setTitle] = useState('')
+  const [total, setTotal] = useState('10')
+  const [price, setPrice] = useState('')
+
+  const load = async () => {
+    const { data } = await supabase.from('session_packages').select('id, title, sessions_total, sessions_used, price, paid').eq('trainer_id', trainerId).eq('client_id', clientId).order('created_at', { ascending: false })
+    setPkgs(((data || []) as any[]).map(p => ({ ...p, price: Number(p.price) })))
+  }
+
+  useEffect(() => { load() }, [trainerId, clientId])
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const n = Number(total)
+    if (!title.trim() || !Number.isInteger(n) || n < 1) return
+    const { error } = await supabase.from('session_packages').insert({ trainer_id: trainerId, client_id: clientId, title: title.trim(), sessions_total: n, price: Number(price) || 0 })
+    if (error) return toast.error('Nie udało się dodać pakietu.')
+    setTitle('')
+    setPrice('')
+    toast.success('Pakiet dodany.')
+    load()
+  }
+
+  const setUsed = async (p: Pkg, used: number) => {
+    if (used < 0 || used > p.sessions_total) return
+    const { error } = await supabase.from('session_packages').update({ sessions_used: used }).eq('id', p.id)
+    if (error) return toast.error('Nie udało się zapisać.')
+    load()
+  }
+
+  const togglePaid = async (p: Pkg) => {
+    await supabase.from('session_packages').update({ paid: !p.paid }).eq('id', p.id)
+    load()
+  }
+
+  const remove = async (p: Pkg) => {
+    if (!(await confirmDialog(`Usunąć pakiet „${p.title}”?`, { confirmLabel: 'Usuń' }))) return
+    await supabase.from('session_packages').delete().eq('id', p.id)
+    load()
+  }
+
+  return (
+    <div className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+      <p className="text-xs font-bold text-zinc-400">Pakiety sesji</p>
+
+      {pkgs.map(p => (
+        <div key={p.id} className="flex flex-col gap-3 rounded-2xl border border-zinc-800 bg-zinc-800 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-bold text-white">{p.title}</p>
+            <span className="text-sm font-bold text-accent-400">{p.sessions_total - p.sessions_used} z {p.sessions_total} sesji zostało</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+            <div className="h-full rounded-full bg-accent-500" style={{ width: `${Math.round((p.sessions_used / p.sessions_total) * 100)}%` }} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setUsed(p, p.sessions_used + 1)} disabled={p.sessions_used >= p.sessions_total} className={`${btnPrimarySm} !py-2 disabled:opacity-40 disabled:pointer-events-none`}>+ sesja odbyta</button>
+            <button type="button" onClick={() => setUsed(p, p.sessions_used - 1)} disabled={p.sessions_used <= 0} className={`${btnGhost} !py-2 disabled:opacity-40 disabled:pointer-events-none`}>− cofnij</button>
+            <button type="button" onClick={() => togglePaid(p)} className={`${btnGhost} !py-2 ${p.paid ? '!text-accent-400' : ''}`}>{p.paid ? 'Opłacony' : 'Oznacz jako opłacony'}{p.price ? ` (${p.price} zł)` : ''}</button>
+            <button type="button" onClick={() => remove(p)} className={`${btnDanger} !py-2`} aria-label="Usuń pakiet"><Icon name="trash" size={16} /></button>
+          </div>
+        </div>
+      ))}
+      {pkgs.length === 0 && <p className="text-sm text-zinc-400">Brak pakietów.</p>}
+
+      <form onSubmit={add} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Nazwa, np. 10 treningów" className={`${inputBase} col-span-2`} />
+        <input type="number" min={1} step={1} value={total} onChange={e => setTotal(e.target.value)} placeholder="Sesji" className={inputBase} />
+        <input type="number" min={0} step="any" value={price} onChange={e => setPrice(e.target.value)} placeholder="Cena zł" className={inputBase} />
+        <button type="submit" disabled={!title.trim()} className={`${btnPrimarySm} col-span-2 sm:col-span-4 disabled:opacity-50 disabled:pointer-events-none`}>Dodaj pakiet</button>
+      </form>
+    </div>
+  )
+}

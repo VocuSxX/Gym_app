@@ -1,0 +1,48 @@
+import { useState } from 'react'
+import { btnPrimarySm, btnGhost, inputBase } from '../../ui'
+import { macrosFor, type Food } from '../../nutrition'
+
+// Wybór gramatury wybranego produktu z podglądem makroskładników
+export default function PortionForm({ food, submitLabel, onSubmit, onBack }: {
+  food: Food
+  submitLabel: string
+  onSubmit: (grams: number) => void
+  onBack: () => void
+}) {
+  const [grams, setGrams] = useState(String(food.serving_g || 100))
+  const g = Number(grams)
+  const valid = Number.isFinite(g) && g > 0 && g <= 5000
+  const m = valid ? macrosFor(food, g) : null
+
+  return (
+    <form onSubmit={e => { e.preventDefault(); if (valid) onSubmit(g) }} className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1">
+        <h4 className="text-xl font-bold text-white">{food.name}</h4>
+        <p className="text-sm text-zinc-400">
+          {food.brand ? `${food.brand} · ` : ''}{food.kcal_100} kcal / 100 g · B {food.protein_100} · W {food.carbs_100} · T {food.fat_100}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="font-bold text-white">Ilość (g)</label>
+        <input type="number" inputMode="decimal" min={1} max={5000} step="any" value={grams} onChange={e => setGrams(e.target.value)} className={inputBase} autoFocus />
+      </div>
+
+      {m && (
+        <div className="grid grid-cols-4 gap-2 text-center">
+          {[['kcal', m.kcal, 'text-emerald-400'], ['Białko', m.protein, 'text-violet-400'], ['Węgle', m.carbs, 'text-amber-400'], ['Tłuszcze', m.fat, 'text-rose-400']].map(([l, v, c]) => (
+            <div key={l as string} className="rounded-2xl border border-white/5 bg-black/30 p-3">
+              <p className={`text-lg font-extrabold ${c}`}>{v}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{l}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-3">
+        <button type="button" onClick={onBack} className={`${btnGhost} flex-1`}>Wstecz</button>
+        <button type="submit" disabled={!valid} className={`${btnPrimarySm} flex-1 disabled:opacity-50 disabled:pointer-events-none`}>{submitLabel}</button>
+      </div>
+    </form>
+  )
+}

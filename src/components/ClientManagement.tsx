@@ -1,14 +1,22 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import { confirmDialog, toast } from '../notify'
 import { glassCard, btnPrimarySm, btnGhost, btnDanger } from '../ui'
+import IntakeView from './invite/IntakeView'
+import ClientPackages from './ClientPackages'
+import Icon from './Icon'
 
 export default function ClientManagement({ session }: { session: any }) {
   const [pendingRequests, setPendingRequests] = useState<any[]>([])
   const [activeClients, setActiveClients] = useState<any[]>([])
   const [blockedClients, setBlockedClients] = useState<any[]>([])
+  // Podopieczni, którym rozwinięto kartę ćwiczącego
+  const [openCards, setOpenCards] = useState<Record<string, boolean>>({})
+  // Podopieczni, którym rozwinięto pakiety sesji
+  const [openPkgs, setOpenPkgs] = useState<Record<string, boolean>>({})
 
   const fetchTrainerClients = async () => {
-    const { data } = await supabase.from('trainer_clients').select(`id, status, welcome_message, client:profiles!client_id(id, nickname)`).eq('trainer_id', session.user.id)
+    const { data } = await supabase.from('trainer_clients').select(`id, status, welcome_message, intake_answers, client:profiles!client_id(id, nickname)`).eq('trainer_id', session.user.id)
     if (data) {
       setPendingRequests(data.filter(req => req.status === 'pending'))
       setActiveClients(data.filter(req => req.status === 'active'))
@@ -18,26 +26,31 @@ export default function ClientManagement({ session }: { session: any }) {
 
   useEffect(() => { fetchTrainerClients() }, [])
 
-  const acceptRequest = async (id: string) => { await supabase.from('trainer_clients').update({ status: 'active' }).eq('id', id); fetchTrainerClients() }
-
-  const blockClient = async (id: string) => {
-    if (window.confirm("Zablokować tego użytkownika? Nie będzie mógł wysyłać Ci zaproszeń.")) {
-      await supabase.from('trainer_clients').update({ status: 'blocked' }).eq('id', id);
-      fetchTrainerClients()
-    }
-  }
-
-  const unblockClient = async (id: string) => {
-    await supabase.from('trainer_clients').delete().eq('id', id);
+  const acceptRequest = async (id: string) => {
+    await supabase.from('trainer_clients').update({ status: 'active' }).eq('id', id)
+    toast.success('Zaproszenie zaakceptowane.')
     fetchTrainerClients()
   }
 
-  // Funkcja do zakończenia współpracy z aktywnym podopiecznym
+  // Blokada jest odwracalna (przycisk Odblokuj), więc bez pytania - tylko krótka informacja
+  const blockClient = async (id: string) => {
+    await supabase.from('trainer_clients').update({ status: 'blocked' }).eq('id', id)
+    toast.info('Użytkownik zablokowany. Możesz go odblokować na dole strony.')
+    fetchTrainerClients()
+  }
+
+  const unblockClient = async (id: string) => {
+    await supabase.from('trainer_clients').delete().eq('id', id)
+    toast.success('Użytkownik odblokowany.')
+    fetchTrainerClients()
+  }
+
+  // Zakończenie współpracy kasuje relację, więc tu pytamy
   const removeClient = async (id: string) => {
-    if (window.confirm("Czy na pewno chcesz zakończyć współpracę z tym podopiecznym? Zniknie on z Twojej listy.")) {
-      await supabase.from('trainer_clients').delete().eq('id', id);
-      fetchTrainerClients()
-    }
+    if (!(await confirmDialog('Zakończyć współpracę z tym podopiecznym? Zniknie z Twojej listy.', { confirmLabel: 'Zakończ' }))) return
+    await supabase.from('trainer_clients').delete().eq('id', id)
+    toast.success('Współpraca zakończona.')
+    fetchTrainerClients()
   }
 
   return (
@@ -49,7 +62,7 @@ export default function ClientManagement({ session }: { session: any }) {
 
       {/* OCZEKUJĄCE */}
       <section className="flex flex-col gap-4">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-amber-400">Oczekujące zaproszenia ({pendingRequests.length})</h2>
+        <h2 className="text-sm font-bold text-amber-400">Oczekujące zaproszenia ({pendingRequests.length})</h2>
         <div className="flex flex-col gap-4">
           {pendingRequests.map(req => (
             <div key={req.id} className={`${glassCard} flex flex-col gap-4 border-amber-500/20`}>
@@ -61,48 +74,57 @@ export default function ClientManagement({ session }: { session: any }) {
                 </div>
               </div>
               {req.welcome_message && (
-                <div className="rounded-2xl border border-white/5 bg-black/30 p-4">
-                  <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Wiadomość powitalna</p>
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+                  <p className="mb-1 text-xs font-bold text-zinc-400">Wiadomość powitalna</p>
                   <p className="text-white">{req.welcome_message}</p>
                 </div>
               )}
+              <IntakeView intake={req.intake_answers} />
             </div>
           ))}
           {pendingRequests.length === 0 && (
-            <div className="rounded-3xl border border-dashed border-white/10 bg-black/20 p-8 text-center text-zinc-400">Brak oczekujących zaproszeń.</div>
+            <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950 p-8 text-center text-zinc-400">Brak oczekujących zaproszeń.</div>
           )}
         </div>
       </section>
 
       {/* AKTYWNI */}
       <section className="flex flex-col gap-4">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-emerald-400">Twoi aktywni podopieczni ({activeClients.length})</h2>
+        <h2 className="text-sm font-bold text-accent-400">Twoi aktywni podopieczni ({activeClients.length})</h2>
         <div className="flex flex-col gap-4">
           {activeClients.map(req => (
-            <div key={req.id} className={`${glassCard} flex items-center justify-between gap-6`}>
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/15 text-xl">💪</div>
-                <p className="text-xl font-bold text-white">@{req.client.nickname}</p>
+            <div key={req.id} className={`${glassCard} flex flex-col gap-4`}>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-500/15 text-accent-400"><Icon name="dumbbell" size={22} /></div>
+                  <p className="text-xl font-bold text-white">@{req.client.nickname}</p>
+                </div>
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button onClick={() => setOpenCards({ ...openCards, [req.id]: !openCards[req.id] })} className={btnGhost}>{openCards[req.id] ? 'Ukryj kartę' : 'Karta'}</button>
+                  <button onClick={() => setOpenPkgs({ ...openPkgs, [req.id]: !openPkgs[req.id] })} className={btnGhost}>{openPkgs[req.id] ? 'Ukryj pakiety' : 'Pakiety'}</button>
+                  <button onClick={() => removeClient(req.id)} className={btnGhost}>Zakończ współpracę</button>
+                  <button onClick={() => blockClient(req.id)} className={btnDanger}>Blokuj</button>
+                </div>
               </div>
-              <div className="flex gap-3">
-                <button onClick={() => removeClient(req.id)} className={btnGhost}>Zakończ współpracę</button>
-                <button onClick={() => blockClient(req.id)} className={btnDanger}>Blokuj</button>
-              </div>
+              {openCards[req.id] && (
+                <IntakeView intake={req.intake_answers} />
+              )}
+              {openPkgs[req.id] && <ClientPackages trainerId={session.user.id} clientId={req.client.id} />}
             </div>
           ))}
           {activeClients.length === 0 && (
-            <div className="rounded-3xl border border-dashed border-white/10 bg-black/20 p-8 text-center text-zinc-400">Nie masz jeszcze aktywnych podopiecznych.</div>
+            <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950 p-8 text-center text-zinc-400">Nie masz jeszcze aktywnych podopiecznych.</div>
           )}
         </div>
       </section>
 
       {/* ZABLOKOWANI */}
       {blockedClients.length > 0 && (
-        <section className="flex flex-col gap-4 border-t border-white/10 pt-8">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Zablokowani użytkownicy ({blockedClients.length})</h2>
+        <section className="flex flex-col gap-4 border-t border-zinc-800 pt-8">
+          <h2 className="text-sm font-bold text-zinc-400">Zablokowani użytkownicy ({blockedClients.length})</h2>
           <div className="flex flex-col gap-4">
             {blockedClients.map(req => (
-              <div key={req.id} className="flex items-center justify-between gap-6 rounded-3xl border border-red-500/10 bg-black/30 p-6 opacity-80">
+              <div key={req.id} className="flex items-center justify-between gap-6 rounded-2xl border border-red-500/10 bg-zinc-950 p-6 opacity-80">
                 <p className="text-lg font-bold text-zinc-400 line-through">@{req.client.nickname}</p>
                 <button onClick={() => unblockClient(req.id)} className={btnGhost}>Odblokuj</button>
               </div>

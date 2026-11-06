@@ -32,7 +32,7 @@ export const supabaseMock = {
   removeChannel: vi.fn(),
   auth: {
     signOut: vi.fn(),
-    signInWithPassword: vi.fn(async () => ({ data: { user: null, session: null }, error: null })),
-    signUp: vi.fn(async () => ({ data: { user: null, session: null }, error: null })),
+    signInWithPassword: vi.fn(async (): Promise<any> => ({ data: { user: null, session: null }, error: null })),
+    signUp: vi.fn(async (): Promise<any> => ({ data: { user: null, session: null }, error: null })),
   },
 }

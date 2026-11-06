@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import { confirmDialog, toast } from '../notify'
 import { glassCard, btnPrimarySm, btnGhost, btnDanger, inputBase } from '../ui'
 import { useMyGym } from '../useMyGym'
 import Banner from './Banner'
@@ -42,8 +43,9 @@ export default function GymTrainers({ session }: { session: any }) {
   }
 
   const remove = async (id: string) => {
-    if (!window.confirm('Usunąć tego trenera z siłowni?')) return
+    if (!(await confirmDialog('Usunąć tego trenera z siłowni?', { confirmLabel: 'Usuń' }))) return
     await supabase.from('gym_trainers').delete().eq('id', id)
+    toast.success('Trener usunięty z siłowni.')
     fetchRows()
   }
 
@@ -69,7 +71,7 @@ export default function GymTrainers({ session }: { session: any }) {
       </form>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-emerald-400">Aktywni trenerzy ({active.length})</h2>
+        <h2 className="text-sm font-bold text-accent-400">Aktywni trenerzy ({active.length})</h2>
         {active.map(r => (
           <div key={r.id} className={`${glassCard} flex items-center justify-between gap-4`}>
             <div className="flex flex-col">
@@ -79,14 +81,14 @@ export default function GymTrainers({ session }: { session: any }) {
             <button onClick={() => remove(r.id)} className={btnDanger}>Usuń</button>
           </div>
         ))}
-        {active.length === 0 && <div className="rounded-3xl border border-dashed border-white/10 bg-black/20 p-8 text-center text-zinc-400">Brak trenerów.</div>}
+        {active.length === 0 && <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950 p-8 text-center text-zinc-400">Brak trenerów.</div>}
       </section>
 
       {pending.length > 0 && (
-        <section className="flex flex-col gap-4 border-t border-white/10 pt-8">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-amber-400">Wysłane zaproszenia ({pending.length})</h2>
+        <section className="flex flex-col gap-4 border-t border-zinc-800 pt-8">
+          <h2 className="text-sm font-bold text-amber-400">Wysłane zaproszenia ({pending.length})</h2>
           {pending.map(r => (
-            <div key={r.id} className="flex items-center justify-between gap-4 rounded-3xl border border-white/5 bg-black/30 p-5">
+            <div key={r.id} className="flex items-center justify-between gap-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
               <p className="font-bold text-zinc-400">@{r.trainer?.nickname}</p>
               <button onClick={() => remove(r.id)} className={btnGhost}>Anuluj</button>
             </div>

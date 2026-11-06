@@ -1,0 +1,76 @@
+import { useState, useEffect } from 'react'
+import { inputBase } from '../../ui'
+import { toast } from '../../notify'
+import { searchLocalFoods, searchOff, ensureFood } from '../../api/food'
+import type { Food, OffFood } from '../../nutrition'
+
+// Wyszukiwarka: Twoje i zapisane produkty + Open Food Facts. Zwraca produkt zapisany w bazie.
+export default function FoodSearch({ userId, onPick }: { userId: string; onPick: (food: Food) => void }) {
+  const [q, setQ] = useState('')
+  const [local, setLocal] = useState<Food[]>([])
+  const [off, setOff] = useState<OffFood[]>([])
+  const [loading, setLoading] = useState(false)
+  const [offDown, setOffDown] = useState(false)
+  const [picking, setPicking] = useState(false)
+
+  useEffect(() => {
+    const query = q.trim()
+    if (query.length < 2) { setLocal([]); setOff([]); setOffDown(false); return }
+    let cancelled = false
+    setLoading(true)
+    const t = setTimeout(async () => {
+      const localRes = await searchLocalFoods(query)
+      let offRes: OffFood[] = []
+      let down = false
+      try { offRes = await searchOff(query) } catch { down = true }
+      if (cancelled) return
+      const known = new Set(localRes.map(f => (f as any).off_code).filter(Boolean))
+      setLocal(localRes)
+      setOff(offRes.filter(o => !known.has(o.off_code)))
+      setOffDown(down)
+      setLoading(false)
+    }, 400)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [q])
+
+  const pickOff = async (o: OffFood) => {
+    if (picking) return
+    setPicking(true)
+    const food = await ensureFood(userId, o)
+    setPicking(false)
+    if (!food) return toast.error('Nie udało się wczytać produktu.')
+    onPick(food)
+  }
+
+  const row = (key: string, name: string, brand: string, v: { kcal_100: number; protein_100: number; carbs_100: number; fat_100: number }, badge: string, onClick: () => void) => (
+    <button key={key} type="button" onClick={onClick} disabled={picking} className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-left transition-all duration-200 hover:border-accent-500/30 hover:bg-zinc-800 active:scale-[0.99] disabled:opacity-60">
+      <div className="min-w-0">
+        <p className="truncate font-bold text-white">{name}</p>
+        <p className="truncate text-xs text-zinc-400">{brand ? `${brand} · ` : ''}B {v.protein_100} · W {v.carbs_100} · T {v.fat_100}</p>
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="font-extrabold text-accent-400">{v.kcal_100}</p>
+        <p className="text-xs font-bold uppercase text-zinc-400">kcal/100g {badge}</p>
+      </div>
+    </button>
+  )
+
+  return (
+    <div className="flex flex-col gap-4">
+      <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="Szukaj produktu, np. jogurt naturalny" className={inputBase} autoFocus />
+
+      {loading && <p className="animate-pulse text-center text-sm font-bold text-zinc-400">Szukam...</p>}
+
+      <div className="flex max-h-80 flex-col gap-2 overflow-y-auto">
+        {local.map(f => row(f.id, f.name, f.brand, f, f.source === 'off' ? 'OFF' : 'moje', () => onPick(f)))}
+        {off.map(o => row(o.off_code, o.name, o.brand, o, 'OFF', () => pickOff(o)))}
+        {!loading && q.trim().length >= 2 && local.length === 0 && off.length === 0 && (
+          <p className="py-4 text-center text-sm text-zinc-400">Brak wyników. Dodaj produkt ręcznie w zakładce „Własny produkt”.</p>
+        )}
+      </div>
+
+      {offDown && <p className="text-xs text-amber-300">Open Food Facts jest chwilowo niedostępny. Widzisz tylko zapisane produkty.</p>}
+      {q.trim().length < 2 && <p className="text-xs text-zinc-400">Wpisz co najmniej 2 litery. „moje” to Twoje produkty, „OFF” to baza Open Food Facts.</p>}
+    </div>
+  )
+}

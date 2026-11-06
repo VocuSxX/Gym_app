@@ -29,20 +29,20 @@ export default function TdeeCalculator({ session, profile, fetchProfile, onChang
 
   return (
     <div className={`${glassCard} flex flex-col gap-5`}>
-      <h3 className="text-xl font-bold text-white">🧮 Zapotrzebowanie (TDEE)</h3>
+      <h3 className="text-xl font-bold text-white">Zapotrzebowanie (TDEE)</h3>
 
       <div className="grid grid-cols-3 gap-3">
-        <div className="flex flex-col gap-1 rounded-2xl border border-white/5 bg-black/30 p-3 text-center">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">BMR</span>
+        <div className="flex flex-col gap-1 rounded-2xl border border-zinc-800 bg-zinc-950 p-3 text-center">
+          <span className="text-xs font-bold text-zinc-400">BMR</span>
           <span className="text-xl font-extrabold text-white">{bmr ?? '-'}</span>
         </div>
-        <div className="flex flex-col gap-1 rounded-2xl border border-white/5 bg-black/30 p-3 text-center">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">TDEE</span>
+        <div className="flex flex-col gap-1 rounded-2xl border border-zinc-800 bg-zinc-950 p-3 text-center">
+          <span className="text-xs font-bold text-zinc-400">TDEE</span>
           <span className="text-xl font-extrabold text-white">{tdee ?? '-'}</span>
         </div>
-        <div className="flex flex-col gap-1 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Cel</span>
-          <span className="text-xl font-extrabold text-emerald-400">{target ?? '-'}</span>
+        <div className="flex flex-col gap-1 rounded-2xl border border-accent-500/30 bg-accent-500/10 p-3 text-center">
+          <span className="text-xs font-bold text-accent-400">Cel</span>
+          <span className="text-xl font-extrabold text-accent-400">{target ?? '-'}</span>
         </div>
       </div>
       <p className="-mt-2 text-xs text-zinc-400">kcal / dzień · wzór Mifflin-St Jeor</p>

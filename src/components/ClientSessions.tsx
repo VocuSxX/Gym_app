@@ -67,7 +67,7 @@ export default function ClientSessions({ session }: { session: any }) {
       {loading && <p className="text-zinc-400 font-bold animate-pulse">Pobieranie sesji...</p>}
 
       {selected && !loading && days.length === 0 && (
-        <div className="rounded-3xl border border-dashed border-white/10 bg-black/20 p-10 text-center text-zinc-400">
+        <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950 p-10 text-center text-zinc-400">
           Ten podopieczny nie ma jeszcze zapisanych serii.
         </div>
       )}
@@ -81,7 +81,7 @@ export default function ClientSessions({ session }: { session: any }) {
 
           return (
             <div key={day} className={`${glassCard} p-0 overflow-hidden`}>
-              <button onClick={() => setOpenDay(isOpen ? null : day)} className="flex w-full items-center justify-between gap-4 p-6 text-left transition-colors hover:bg-white/5">
+              <button onClick={() => setOpenDay(isOpen ? null : day)} className="flex w-full items-center justify-between gap-4 p-6 text-left transition-colors hover:bg-zinc-800">
                 <div className="flex flex-col gap-1">
                   <span className="text-xl font-bold text-white">{day}</span>
                   <span className="text-sm text-zinc-400">{exercises.length} ćwiczeń · {totalSets} serii · objętość {Math.round(volume)} kg</span>
@@ -90,13 +90,13 @@ export default function ClientSessions({ session }: { session: any }) {
               </button>
 
               {isOpen && (
-                <div className="flex flex-col gap-6 border-t border-white/10 p-6">
+                <div className="flex flex-col gap-6 border-t border-zinc-800 p-6">
                   {exercises.map(ex => (
                     <div key={ex.exId || ex.name} className="flex flex-col gap-3">
-                      <h3 className="font-bold text-emerald-400">{ex.name}</h3>
+                      <h3 className="font-bold text-accent-400">{ex.name}</h3>
                       <div className="flex flex-wrap gap-2">
                         {[...ex.sets].sort((a, b) => a.set_number - b.set_number).map(s => (
-                          <span key={s.id} className="rounded-xl border border-white/5 bg-black/30 px-3 py-2 text-sm text-white">
+                          <span key={s.id} className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white">
                             <span className="text-zinc-400">#{s.set_number}</span> {s.weight} kg × {s.reps}
                           </span>
                         ))}

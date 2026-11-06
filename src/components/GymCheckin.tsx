@@ -1,0 +1,139 @@
+import { useState, useEffect, useRef } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { supabase } from '../supabaseClient'
+import { glassCard, btnGhost } from '../ui'
+import { checkinUrl } from '../checkin'
+import Icon from './Icon'
+
+const tooltipStyle = { backgroundColor: 'rgba(9,9,11,0.85)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '1rem', color: '#fff' }
+
+// Dla siłowni: kod QR do meldowania członków + statystyki ruchu
+export default function GymCheckin({ session }: { session: any }) {
+  const [gymId, setGymId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [byDay, setByDay] = useState<{ week: string; cnt: number }[]>([])
+  const [byHour, setByHour] = useState<{ hour: string; cnt: number }[]>([])
+  const [active, setActive] = useState(0)
+  const [today, setToday] = useState(0)
+  const qrRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const load = async () => {
+      const { data: gym } = await supabase.from('gyms').select('id').eq('owner_id', session.user.id).maybeSingle()
+      if (!gym) { setLoading(false); return }
+      setGymId(gym.id)
+
+      const [{ data: days }, { data: hours }, { data: act }] = await Promise.all([
+        supabase.rpc('gym_stats_by_day', { g: gym.id, p_days: 56 }),
+        supabase.rpc('gym_stats_by_hour', { g: gym.id, p_days: 56 }),
+        supabase.rpc('gym_active_members', { g: gym.id, p_days: 7 }),
+      ])
+
+      // Dni -> tygodnie (8 ostatnich), dziś osobno
+      const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw' }).format(new Date())
+      const dayRows = ((days || []) as { day: string; cnt: number }[])
+      setToday(dayRows.find(r => r.day === todayKey)?.cnt || 0)
+      const weeks: Record<string, number> = {}
+      dayRows.forEach(r => {
+        const d = new Date(r.day + 'T00:00:00')
+        const shift = (d.getDay() + 6) % 7
+        d.setDate(d.getDate() - shift)
+        const key = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`
+        weeks[key] = (weeks[key] || 0) + r.cnt
+      })
+      setByDay(Object.entries(weeks).map(([week, cnt]) => ({ week, cnt })))
+
+      const hourMap: Record<number, number> = {}
+      ;((hours || []) as { hour: number; cnt: number }[]).forEach(r => { hourMap[r.hour] = r.cnt })
+      setByHour(Array.from({ length: 18 }, (_, i) => i + 5).map(h => ({ hour: `${h}:00`, cnt: hourMap[h] || 0 })))
+      setActive(Number(act) || 0)
+      setLoading(false)
+    }
+    load()
+  }, [session])
+
+  const downloadPng = () => {
+    const svg = qrRef.current?.querySelector('svg')
+    if (!svg) return
+    const xml = new XMLSerializer().serializeToString(svg)
+    const img = new Image()
+    img.onload = () => {
+      const size = 1024
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, size, size)
+      ctx.drawImage(img, 0, 0, size, size)
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = 'mygym-checkin-qr.png'
+      a.click()
+    }
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml)
+  }
+
+  if (loading) return <p className="font-bold text-zinc-400 animate-pulse">Ładowanie...</p>
+  if (!gymId) return <div className={`${glassCard} max-w-xl text-center`}><p className="text-zinc-400">Nie znaleziono siłowni przypisanej do Twojego konta.</p></div>
+
+  const peak = byHour.reduce((m, h) => (h.cnt > m.cnt ? h : m), { hour: '-', cnt: 0 })
+
+  return (
+    <div className="max-w-4xl w-full flex flex-col gap-8 animate-fade-in">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-4xl font-extrabold tracking-tight text-white">Check-in i statystyki</h1>
+        <p className="text-zinc-400">Wydrukuj kod i powieś przy wejściu. Członkowie skanują go telefonem i meldują się jednym kliknięciem.</p>
+      </div>
+
+      <div className={`${glassCard} flex flex-col items-center gap-6 sm:flex-row`}>
+        <div ref={qrRef} className="rounded-2xl bg-white p-4">
+          <QRCodeSVG value={checkinUrl(gymId)} size={192} includeMargin={false} />
+        </div>
+        <div className="flex flex-1 flex-col gap-3">
+          <h2 className="text-xl font-bold text-white">Kod QR siłowni</h2>
+          <p className="text-sm text-zinc-400">Meldować mogą się tylko członkowie siłowni (zakładka „Moja Siłownia”) i jej trenerzy. Jeden check-in dziennie na osobę.</p>
+          <button type="button" onClick={downloadPng} className={`${btnGhost} w-fit`}><Icon name="download" size={16} />Pobierz PNG do druku</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className={glassCard}><p className="text-xs font-bold text-zinc-400">Dziś</p><p className="text-4xl font-extrabold text-accent-400">{today}</p></div>
+        <div className={glassCard}><p className="text-xs font-bold text-zinc-400">Aktywni (7 dni)</p><p className="text-4xl font-extrabold text-accent-400">{active}</p></div>
+        <div className={glassCard}><p className="text-xs font-bold text-zinc-400">Szczyt</p><p className="text-4xl font-extrabold text-accent-400">{peak.cnt > 0 ? peak.hour : '-'}</p></div>
+      </div>
+
+      <div className={`${glassCard} flex flex-col gap-4`}>
+        <h2 className="text-xl font-bold text-white">Wejścia tygodniowo</h2>
+        <div className="w-full" style={{ height: '240px' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={byDay} margin={{ top: 5, right: 10, bottom: 5, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+              <XAxis dataKey="week" stroke="#a1a1aa" tick={{ fill: '#a1a1aa', fontSize: 12 }} />
+              <YAxis stroke="#a1a1aa" tick={{ fill: '#a1a1aa' }} allowDecimals={false} />
+              <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: '#6f93ff' }} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+              <Bar dataKey="cnt" fill="#6f93ff" radius={[6, 6, 0, 0]} name="Wejścia" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className={`${glassCard} flex flex-col gap-4`}>
+        <h2 className="text-xl font-bold text-white">Godziny szczytu (ostatnie 8 tygodni)</h2>
+        <div className="w-full" style={{ height: '240px' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={byHour} margin={{ top: 5, right: 10, bottom: 5, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+              <XAxis dataKey="hour" stroke="#a1a1aa" tick={{ fill: '#a1a1aa', fontSize: 11 }} interval={1} />
+              <YAxis stroke="#a1a1aa" tick={{ fill: '#a1a1aa' }} allowDecimals={false} />
+              <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: '#6f93ff' }} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+              <Bar dataKey="cnt" fill="#9a9da3" radius={[6, 6, 0, 0]} name="Wejścia" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  )
+}
